@@ -130,15 +130,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
-      - name: Retain Windows package on failure
-        if: ${{ failure() && matrix.platform == 'win' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: win-unpacked-${{ github.run_id }}-${{ github.run_attempt }}
-          path: dist/win-unpacked/
-          if-no-files-found: ignore
-          retention-days: 3
-
       - name: Retain approved tag packages
         if: ${{ inputs.upload-packages && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v') }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
