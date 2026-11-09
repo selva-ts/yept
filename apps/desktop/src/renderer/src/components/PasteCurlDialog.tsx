@@ -1,6 +1,6 @@
 // "Paste cURL": a curl command becomes a new request in a collection or folder. The command is only read here for
 // the preview; main parses it again when creating the request. Files the command names are never read.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import type { TreeNode } from '@shared/model';
 import { CurlParseError, curlRequestName, parseCurl, type ParsedCurl } from '@shared/curl';
 import { errorMessage, yept } from '@yept/ui/api';
@@ -51,7 +51,8 @@ export function PasteCurlDialog(): React.JSX.Element | null {
   const { list, parentOf } = useMemo(() => targets(snapshot?.collections ?? [], activeId), [snapshot, activeId]);
   const { parsed, error } = useMemo(() => parse(command), [command]);
 
-  useEffect(() => {
+  // Before paint, so the dialog never shows the previous command for a frame.
+  useLayoutEffect(() => {
     if (!curlPaste) return;
     setCommand(curlPaste.command);
     setNameEdited(false);

@@ -106,7 +106,7 @@ jobs:
         run: npm run e2e 2>&1 | tee out/ci/e2e.log
 
       - name: Package desktop app
-        run: npm run package:${{ matrix.platform }} -- --${{ matrix.arch }} 2>&1 | tee out/ci/package.log
+        run: npm run package:${{ matrix.platform }} -- --${{ matrix.arch }} --publish never 2>&1 | tee out/ci/package.log
 
       - name: Check Windows package
         if: matrix.platform == 'win'
