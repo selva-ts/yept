@@ -16,18 +16,22 @@ import { run, type RunOptions } from './runner';
 
 let server: Server;
 let base = '';
+// Normal scripts get a generous limit so a slow machine cannot time them out; the runaway-script test uses its own short one.
 let sandbox: SandboxHost;
+let quick: SandboxHost;
 
 beforeAll(async () => {
   server = createFixtureServer();
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  sandbox = new SandboxHost(new URL('../sandbox/worker.mjs', import.meta.url), { timeoutMs: 1500 });
+  sandbox = new SandboxHost(new URL('../sandbox/worker.mjs', import.meta.url), { timeoutMs: 10000 });
+  quick = new SandboxHost(new URL('../sandbox/worker.mjs', import.meta.url), { timeoutMs: 1500 });
 });
 afterAll(async () => {
   server.closeAllConnections();
   server.close();
   await sandbox.close();
+  await quick.close();
 });
 
 const noAuth: AuthConfig = { mode: 'none', bearer: { token: '' }, basic: { username: '', password: '' }, apikey: { key: '', value: '', placement: 'header' }, oauth2: { ...DEFAULT_OAUTH2 } };
@@ -161,11 +165,11 @@ describe('scripts', () => {
   });
 
   it('a runaway pre-request script is stopped and reported', async () => {
-    const r = await run(doc({ script: { req: 'while (true) {}', res: '' } }), opts({ layers: env() }));
+    const r = await run(doc({ script: { req: 'while (true) {}', res: '' } }), opts({ layers: env(), sandbox: quick }));
     expect(r.result.outcome).toBe('prepare_error');
     expect(r.result.error?.message).toMatch(/timed out after 1500 ms/);
     // The sandbox recovers for the next run.
-    const next = await run(doc(), opts({ layers: env() }));
+    const next = await run(doc(), opts({ layers: env(), sandbox: quick }));
     expect(next.result.status).toBe(200);
   });
 
