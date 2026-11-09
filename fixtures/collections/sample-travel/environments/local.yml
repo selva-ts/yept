@@ -1,0 +1,10 @@
+name: local
+variables:
+  - name: baseUrl
+    value: http://localhost:4010
+  - name: clientId
+    value: sample-client
+  - secret: true
+    name: clientSecret
+  - secret: true
+    name: accessToken

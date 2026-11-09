@@ -1,0 +1,41 @@
+openapi: 3.0.3
+info:
+  title: Sample Bookings API
+  version: 1.0.0
+servers:
+  - url: http://localhost:4010
+paths:
+  /bookings:
+    get:
+      summary: List bookings
+      tags: [Bookings]
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [all, open] }
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Create booking
+      tags: [Bookings]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                traveller: { type: string, example: Alex Example }
+                destination: { type: string, example: Lisbon }
+      responses:
+        '201': { description: Created }
+  /bookings/{id}:
+    get:
+      summary: Get booking
+      tags: [Bookings]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }

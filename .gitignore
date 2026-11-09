@@ -1,0 +1,22 @@
+node_modules/
+dist/
+out/
+.vscode-test/
+build/THIRD_PARTY_NOTICES.txt
+# Copied from the root LICENSE by the extension build.
+apps/vscode/LICENSE.txt
+*.log
+.env
+.env.*
+# Local-only secrets and data. Never commit.
+.local-secrets.json
+*.local.json
+# Real team collections must never enter this repo (see docs: open-source readiness).
+real-collections/
+
+# .NET build output
+bin/
+obj/
+
+# e2e screenshots
+e2e/out/

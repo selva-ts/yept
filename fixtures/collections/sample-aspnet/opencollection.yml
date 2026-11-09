@@ -1,0 +1,10 @@
+opencollection: 1.0.0
+
+info:
+  name: Sample ASP.NET API
+
+request:
+  auth:
+    type: bearer
+    token: "{{accessToken}}"
+bundled: false

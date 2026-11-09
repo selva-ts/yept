@@ -1,0 +1,28 @@
+{
+  "name": "@yept/core",
+  "version": "0.9.0",
+  "private": true,
+  "license": "MIT",
+  "exports": {
+    "./engine/sandbox/worker.mjs": "./src/engine/sandbox/worker.mjs",
+    "./engine/*": "./src/engine/*.ts",
+    "./shared/*": "./src/shared/*.ts",
+    "./services/*": "./src/services/*.ts"
+  },
+  "dependencies": {
+    "@usebruno/common": "0.26.0",
+    "@usebruno/converters": "0.24.0",
+    "@usebruno/filestore": "0.13.0",
+    "@usebruno/js": "0.54.0",
+    "@usebruno/requests": "file:../../shims/usebruno-requests",
+    "axios": "1.20.0",
+    "follow-redirects": "1.16.1",
+    "js-yaml": "4.3.1",
+    "qs": "6.16.1",
+    "tough-cookie": "6.0.2",
+    "chokidar": "5.0.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

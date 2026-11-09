@@ -1,0 +1,5 @@
+# Normalise to LF everywhere so collection round-trip checks are byte-exact on every OS.
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.icns binary

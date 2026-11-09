@@ -1,0 +1,47 @@
+appId: dev.yept.app
+productName: Yept
+copyright: Copyright (c) 2026 Selva Subramaniam
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**
+  - package.json
+  - "!**/*.{map,md,ts}"
+asar: true
+extraResources:
+  - from: LICENSE
+    to: LICENSE.txt
+  - from: build/THIRD_PARTY_NOTICES.txt
+    to: THIRD_PARTY_NOTICES.txt
+  - from: build/yept-icon.png
+    to: yept-icon.png
+win:
+  icon: build/yept-icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  installerIcon: build/yept-icon.ico
+  uninstallerIcon: build/yept-icon.ico
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: Yept-Setup-${version}.${ext}
+mac:
+  icon: build/yept-icon-1024.png
+  category: public.app-category.developer-tools
+  # Local test builds are unsigned (no Apple Developer ID).
+  # Apple Silicon needs at least an ad-hoc signature; see docs/macos-build.md.
+  identity: null
+  artifactName: Yept-${version}-mac-${arch}.${ext}
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+npmRebuild: false
+electronLanguages:
+  - en-US
+  # macOS names its English locale folder en.lproj.
+  - en

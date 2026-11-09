@@ -1,0 +1,59 @@
+/* Host tokens override desktop palettes and OS preference only in the extension bundle. */
+body {
+  --bg: var(--vscode-editor-background);
+  --panel: var(--vscode-editor-background);
+  --panel-2: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  --ink: var(--vscode-editor-foreground);
+  --mute: var(--vscode-descriptionForeground);
+  --line: var(--vscode-panel-border, var(--vscode-contrastBorder, var(--vscode-input-border, transparent)));
+  --line-soft: var(--line);
+  /* Desktop uses --accent as text and borders too; high-contrast dark has a black button background, so buttons use button tokens below. */
+  --accent: var(--vscode-textLink-foreground);
+  --accent-ink: var(--vscode-editor-background);
+  /* High-contrast dark has no inactive selection colour. */
+  --accent-soft: var(--vscode-list-inactiveSelectionBackground, var(--vscode-list-hoverBackground));
+  --ok: var(--vscode-testing-iconPassed, var(--vscode-editor-foreground));
+  --bad: var(--vscode-errorForeground);
+  --warn: var(--vscode-editorWarning-foreground);
+  --info: var(--vscode-textLink-foreground);
+  --code: var(--vscode-editor-background);
+  --sel: var(--vscode-list-hoverBackground);
+  --tree-line: var(--line);
+  --folder: var(--vscode-icon-foreground);
+  --var: var(--vscode-textLink-foreground);
+  --var-bg: var(--vscode-editor-selectionHighlightBackground, transparent);
+  --var-secret: var(--vscode-editorWarning-foreground);
+  --var-secret-bg: var(--var-bg);
+  --var-missing: var(--vscode-errorForeground);
+  --var-dynamic: var(--vscode-textLink-foreground);
+  --shadow: 0 2px 8px var(--vscode-widget-shadow, transparent);
+  --code-size: var(--vscode-editor-font-size);
+  --mono: var(--vscode-editor-font-family);
+  --sans: var(--vscode-font-family);
+  --serif: var(--vscode-font-family);
+  font: var(--vscode-font-weight) var(--vscode-font-size)/1.45 var(--vscode-font-family);
+  color: var(--ink); background: var(--bg);
+}
+body.vscode-light, body.vscode-high-contrast-light { color-scheme: light; }
+body.vscode-dark, body.vscode-high-contrast { color-scheme: dark; }
+html, body, #root { height: 100%; margin: 0; }
+.request-panel { height: 100%; display: grid; grid-template-rows: minmax(240px, 1fr) minmax(200px, 1fr); overflow: hidden; }
+.runner-panel { height: 100%; overflow: auto; }
+/* Dev Tools fills its view in the bottom panel, which has its own border and resize handle. */
+.devtools-view { height: 100%; border-top: none; }
+.input, input, select, textarea { background: var(--vscode-input-background); color: var(--vscode-input-foreground); border-color: var(--vscode-input-border, var(--line)); border-radius: 2px; }
+input::placeholder, textarea::placeholder { color: var(--vscode-input-placeholderForeground); }
+.btn { border-radius: 2px; }
+.btn.primary { background: var(--vscode-button-background); border-color: var(--vscode-button-border, var(--vscode-button-background)); color: var(--vscode-button-foreground); }
+.btn.primary:hover { background: var(--vscode-button-hoverBackground); filter: none; }
+/* High-contrast themes have no toolbar hover colour; VS Code marks hover with a dashed outline there. */
+.btn.ghost:hover { background: var(--vscode-toolbar-hoverBackground, var(--sel)); }
+body.vscode-high-contrast .btn.ghost:hover, body.vscode-high-contrast-light .btn.ghost:hover { outline: 1px dashed var(--vscode-contrastActiveBorder); outline-offset: -1px; }
+:focus-visible, .input:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; box-shadow: none; }
+::selection { background: var(--vscode-editor-selectionBackground); }
+a { color: var(--vscode-textLink-foreground); }
+.toast.error { background: var(--vscode-inputValidation-errorBackground); color: var(--vscode-inputValidation-errorForeground, var(--ink)); border: 1px solid var(--vscode-inputValidation-errorBorder); }
+body.vscode-high-contrast .btn, body.vscode-high-contrast-light .btn { border-color: var(--vscode-contrastBorder); }
+/* A high-contrast theme may use a black button background; active tabs still need a visible marker. */
+.subtab.active { border-bottom-color: var(--vscode-tab-activeBorderTop, var(--vscode-focusBorder)); }
+input[type='checkbox'], input[type='radio'] { accent-color: var(--vscode-focusBorder); }

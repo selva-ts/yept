@@ -1,0 +1,8 @@
+{
+  "name": "@usebruno/requests",
+  "version": "0.0.0-local-shim",
+  "private": true,
+  "license": "MIT",
+  "description": "Local stand-in for @usebruno/requests. @usebruno/js requires it (undeclared) only for bru.sendRequest and bru.cookies; Yept's sandbox worker supplies both. The real package pulls in AWS, Azure, GCP and gRPC SDKs.",
+  "main": "index.js"
+}

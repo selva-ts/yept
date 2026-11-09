@@ -1,0 +1,18 @@
+meta {
+  name: Create booking
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/bookings
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "tripId": "trip-1",
+    "travellers": 2
+  }
+}

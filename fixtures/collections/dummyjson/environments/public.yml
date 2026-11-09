@@ -1,0 +1,10 @@
+name: public
+variables:
+  - name: baseUrl
+    value: https://dummyjson.com
+  - secret: true
+    name: username
+  - secret: true
+    name: password
+  - secret: true
+    name: accessToken

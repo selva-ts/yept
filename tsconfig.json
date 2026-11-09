@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "types": ["node", "electron-vite/node"],
+    "paths": {
+      "@shared/*": ["./packages/core/src/shared/*"],
+      "@yept/core/*": ["./packages/core/src/*"],
+      "@yept/ui/*": ["./packages/ui/src/*"]
+    }
+  },
+  "include": ["packages/*/src/**/*", "apps/desktop/src/**/*", "apps/vscode/src/**/*.test.ts", "electron.vite.config.ts", "vitest.config.ts"]
+}

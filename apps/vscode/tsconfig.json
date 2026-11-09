@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "types": [
+      "node",
+      "vscode"
+    ]
+  },
+  "include": [
+    "src/extension.ts",
+    "src/diagnostics.ts",
+    "src/handlers.ts",
+    "src/panel.ts",
+    "src/webview-binding.ts",
+    "test/suite/**/*.ts",
+    "../../packages/core/src/modules.d.ts"
+  ]
+}

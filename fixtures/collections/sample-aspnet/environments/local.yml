@@ -1,0 +1,10 @@
+name: local
+variables:
+  - name: baseUrl
+    value: https://localhost:7443
+  - name: username
+    value: demo
+  - secret: true
+    name: password
+  - secret: true
+    name: accessToken

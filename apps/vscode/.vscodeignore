@@ -1,0 +1,16 @@
+# Package only what runs and what the store pages show: the built extension, worker, wasm, webview and notices,
+# the icon, README, CHANGELOG and licence. package.json is always included. Screenshots stay out: the README links
+# to them by absolute URL.
+# vsce lets any "!" pattern win over the ignores, so list the kept files by type rather than excluding source maps.
+**
+!README.md
+!CHANGELOG.md
+!LICENSE.txt
+!media/*.svg
+!media/*.png
+!dist/*.cjs
+!dist/*.wasm
+!dist/*.txt
+!dist/webview/*.js
+!dist/webview/*.mjs
+!dist/webview/*.css

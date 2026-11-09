@@ -1,0 +1,361 @@
+{
+  "version": 1,
+  "supplements": {
+    "pako@1.0.11": [
+      {
+        "file": "lib/zlib/README",
+        "sha256": "d8b499598e43d755ea8918448128259ff01820c50d94d5a48c8883d0a594ddb1",
+        "integrity": "sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw==",
+        "source": "https://github.com/nodeca/pako/blob/1.0.11/lib/zlib/README"
+      }
+    ]
+  },
+  "standards": {
+    "MIT": {
+      "file": "standard-MIT.txt",
+      "sha256": "25c4576db4a90ddaddaf1b5cd83dc1a537e600041009f6ca71ec62d770ea4390",
+      "source": "https://raw.githubusercontent.com/spdx/license-list-data/31846481de7ea17d92f2f46fad76abe58b2e9bb0/text/MIT.txt",
+      "sourceSha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+      "note": "Standard licence terms. SPDX copyright placeholders are omitted; package attribution is recorded separately."
+    },
+    "BSD-2-Clause": {
+      "file": "standard-BSD-2-Clause.txt",
+      "sha256": "f6036f79d054f42e11f2dd52458b4d2282e901d197955e598bf1a23600280cf0",
+      "source": "https://raw.githubusercontent.com/spdx/license-list-data/31846481de7ea17d92f2f46fad76abe58b2e9bb0/text/BSD-2-Clause.txt",
+      "sourceSha256": "f32fb3b417a194167cfad068223fc975ba96c5960513a10f66a3c28720aec1df",
+      "note": "Standard licence terms. SPDX copyright placeholders are omitted; package attribution is recorded separately."
+    },
+    "ISC": {
+      "file": "standard-ISC.txt",
+      "sha256": "945a2f51f2b6fc948e2403f43272fa50ec11bfd6ca8529e23272b1890c69a324",
+      "source": "https://raw.githubusercontent.com/spdx/license-list-data/31846481de7ea17d92f2f46fad76abe58b2e9bb0/text/ISC.txt",
+      "sourceSha256": "521c6f0ed8e64736684f89843d16a4df6b4b7449acbcfc6ca6630a3037ca8c53",
+      "note": "Standard licence terms. SPDX copyright placeholders are omitted; package attribution is recorded separately."
+    },
+    "WTFPL": {
+      "file": "standard-WTFPL.txt",
+      "sha256": "13d8825a59e5e546d41e8711405d0f335a9934362a47c04a3b4280fa7932dc4a",
+      "source": "https://raw.githubusercontent.com/spdx/license-list-data/31846481de7ea17d92f2f46fad76abe58b2e9bb0/text/WTFPL.txt",
+      "sourceSha256": "13d8825a59e5e546d41e8711405d0f335a9934362a47c04a3b4280fa7932dc4a",
+      "note": "Standard licence terms. SPDX copyright placeholders are omitted; package attribution is recorded separately."
+    }
+  },
+  "packages": {
+    "@electron-internal/extract-zip@1.0.5": {
+      "license": "BSD-2-Clause",
+      "kind": "declared-standard",
+      "standard": "BSD-2-Clause",
+      "source": "https://registry.npmjs.org/%40electron-internal%2Fextract-zip/1.0.5",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "integrity": "sha512-+bqFCP98pLI0Tt0XQo1TmlXtwjWchISndDOxCkEcIuUgXWpBnLyRI+2DU+mesvnMMX6L1XDqYNA0lXNDHd/yiA=="
+    },
+    "agent-base@6.0.2": {
+      "license": "MIT",
+      "kind": "published-readme",
+      "file": "agent-base-6.0.2.txt",
+      "sha256": "b4a61ad090ceccf04cefa5fdc23e0c5c3cec09795c344460f01a2112f6d69463",
+      "source": "https://registry.npmjs.org/agent-base/6.0.2",
+      "evidenceFile": "README.md",
+      "evidenceSha256": "f1425c3b72330fe4fb2aa5a2fb152e939bdf534692a32b5f0b38f74147b98556",
+      "note": "Complete MIT grant and copyright notice extracted verbatim from the published README.",
+      "integrity": "sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ=="
+    },
+    "https-proxy-agent@5.0.1": {
+      "license": "MIT",
+      "kind": "published-readme",
+      "file": "https-proxy-agent-5.0.1.txt",
+      "sha256": "b4a61ad090ceccf04cefa5fdc23e0c5c3cec09795c344460f01a2112f6d69463",
+      "source": "https://registry.npmjs.org/https-proxy-agent/5.0.1",
+      "evidenceFile": "README.md",
+      "evidenceSha256": "32f0856d2c43df7d05cca960fdee84e1e38ab545bd7b2186433dfa41aa90a712",
+      "note": "Complete MIT grant and copyright notice extracted verbatim from the published README.",
+      "integrity": "sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA=="
+    },
+    "app-builder-lib@26.15.3": {
+      "license": "MIT",
+      "kind": "declared-standard",
+      "standard": "MIT",
+      "source": "https://registry.npmjs.org/app-builder-lib/26.15.3",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "author": "Vladimir Krivosheev",
+      "integrity": "sha512-2VnyWkqsP5v5XbBhL3tD5Syx8iNPBYsoU7kY4S2fz7wg8Rj/nztWKCUzGKaFRTv0Xwf3/H058CR1Kvtd/3lRow=="
+    },
+    "arcsecond@5.0.0": {
+      "license": "MIT",
+      "kind": "declared-standard",
+      "standard": "MIT",
+      "source": "https://registry.npmjs.org/arcsecond/5.0.0",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "author": "Francis Stokes",
+      "integrity": "sha512-J/fHdyadnsIencRsM6oUSsraCKG+Ni9Udcgr/eusxjTzX3SEQtCUQSpP0YtImFPfIK6DdT1nqwN0ng4FqNmwgA=="
+    },
+    "assertion-error@1.1.0": {
+      "license": "MIT",
+      "kind": "published-readme",
+      "file": "assertion-error-1.1.0.txt",
+      "sha256": "8893105b62a688ea346e27ddf2cad0e71ca00049d54745bf4d709da0dfbbc15d",
+      "source": "https://registry.npmjs.org/assertion-error/1.1.0",
+      "evidenceFile": "README.md",
+      "evidenceSha256": "b1f91abd42bf32345d5a0d6378cb98769108befd89473b3a6b9373b500442ab5",
+      "note": "Complete MIT grant and copyright notice extracted verbatim from the published README.",
+      "integrity": "sha512-jgsaNduz+ndvGyFt3uSuWqvy4lCnIJiovtouQN5JZHOKCS2QuhEdbcQHFhVksz2N2U9hXJo8odG7ETyWlEeuDw=="
+    },
+    "boolbase@1.0.0": {
+      "license": "ISC",
+      "kind": "declared-standard",
+      "standard": "ISC",
+      "source": "https://registry.npmjs.org/boolbase/1.0.0",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "author": "Felix Boehm",
+      "integrity": "sha512-JZOSA7Mo9sNGB8+UjSgzdLtokWAky1zbztM3WRLCbZ70/3cTANmQmOdR7y2g+J0e2WXywy1yS468tY+IruqEww=="
+    },
+    "chromium-pickle-js@0.2.0": {
+      "license": "MIT",
+      "kind": "declared-standard",
+      "standard": "MIT",
+      "source": "https://registry.npmjs.org/chromium-pickle-js/0.2.0",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "integrity": "sha512-1R5Fho+jBq0DDydt+/vHWj5KJNJCKdARKOCwZUen84I5BreWoLqRLANH1U87eJy1tiASPtMnGqJJq0ZsLoRPOw=="
+    },
+    "compare-version@0.1.2": {
+      "license": "MIT",
+      "kind": "declared-standard",
+      "standard": "MIT",
+      "source": "https://registry.npmjs.org/compare-version/0.1.2",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "author": "Kevin Mårtensson",
+      "integrity": "sha512-pJDh5/4wrEnXX/VWRZvruAGHkzKdr46z11OlTPN+VrATlWWhSKewNCJ1futCO5C7eJB3nPMFZA1LeYtcFboZ2A=="
+    },
+    "cross-dirname@0.1.0": {
+      "license": "MIT",
+      "kind": "declared-standard",
+      "standard": "MIT",
+      "source": "https://registry.npmjs.org/cross-dirname/0.1.0",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "integrity": "sha512-+R08/oI0nl3vfPcqftZRpytksBXDzOUveBq/NBVx0sUp1axwzPQrKinNx5yd5sxPu8j1wIy8AfnVQ+5eFdha6Q=="
+    },
+    "dmg-builder@26.15.3": {
+      "license": "MIT",
+      "kind": "declared-standard",
+      "standard": "MIT",
+      "source": "https://registry.npmjs.org/dmg-builder/26.15.3",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "author": "Vladimir Krivosheev",
+      "integrity": "sha512-O3zJUFUYHJKgzPqioHxfxzBzlSC1eXCSr79gMSBKBP5AgjjpmrydMsMLotEg9fAJF36vdUncb+4ndRNxoPdlSQ=="
+    },
+    "err-code@2.0.3": {
+      "license": "MIT",
+      "kind": "declared-standard",
+      "standard": "MIT",
+      "source": "https://registry.npmjs.org/err-code/2.0.3",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "author": "IndigoUnited",
+      "integrity": "sha512-2bmlRpNKBxT/CRmPOlyISQpNj+qSeYvcym/uT0Jx2bMOlKLtSy1ZmLuVxSEKKyor/N5yhvp/ZiG1oE3DEYMSFA=="
+    },
+    "filelist@1.0.6": {
+      "license": "Apache-2.0",
+      "kind": "upstream-source",
+      "file": "filelist-1.0.6.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "source": "https://raw.githubusercontent.com/mde/filelist/v1.0.6/LICENSE",
+      "integrity": "sha512-5giy2PkLYY1cP39p17Ech+2xlpTRL9HLspOfEgm0L6CwBXBTgsK5ou0JtzYuepxkaQ/tvhCFIJ5uXo0OrM2DxA=="
+    },
+    "flow-estree@0.336.0": {
+      "license": "MIT",
+      "kind": "upstream-source",
+      "file": "flow-estree-0.336.0.txt",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "source": "https://raw.githubusercontent.com/facebook/flow/v0.336.0/LICENSE",
+      "integrity": "sha512-0VaGWHJourzh88otU5bVJ4Z/oIsD+R6yaeR0Q8t8dezsKQI/RLi5m3fNzkiLYLhJ+YwM3JRSKlOqGplOI5Yo3w=="
+    },
+    "flow-parser@0.336.0": {
+      "license": "MIT",
+      "kind": "upstream-source",
+      "file": "flow-parser-0.336.0.txt",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "source": "https://raw.githubusercontent.com/facebook/flow/v0.336.0/LICENSE",
+      "integrity": "sha512-O8QvQf/B3rBF+eagcc9/WMAjfJoaKckdgSd8PT/qvMIIe4ZjVKrSqV5SDnRFAKY0VrE8r5C4ADYgvYhmwkWADA=="
+    },
+    "imurmurhash@0.1.4": {
+      "license": "MIT",
+      "kind": "upstream-source",
+      "file": "imurmurhash-0.1.4.txt",
+      "sha256": "fa0943ddcaa857d901a9eb92254d89876297ecdfbc884d294a927df08ebcbbe8",
+      "source": "https://raw.githubusercontent.com/jensyt/imurmurhash-js/0.1.4/LICENSE",
+      "integrity": "sha512-JmXMZ6wuvDmLiHEml9ykzqO6lwFbof0GG4IkcGaENdCRDDmMVnny7s5HsIgHCbaq0w2MyPhDqkhTUgS2LU2PHA=="
+    },
+    "isarray@1.0.0": {
+      "license": "MIT",
+      "kind": "published-readme",
+      "file": "isarray-1.0.0.txt",
+      "sha256": "c355429bbdca68ca754a209b3064045b0844244de96768eb6596af8f2b850c40",
+      "source": "https://registry.npmjs.org/isarray/1.0.0",
+      "evidenceFile": "README.md",
+      "evidenceSha256": "ff138e683771b187f3629c383db72ee7d632009010a36d08e18e8d2a34222ec7",
+      "note": "Complete MIT grant and copyright notice extracted verbatim from the published README.",
+      "integrity": "sha512-VLghIWNM6ELQzo7zwmcg0NmTVyWKYjvIeM83yjp0wRDTmUnrM678fQbcKBo6n2CJEF0szoG//ytg+TKla89ALQ=="
+    },
+    "jake@10.9.4": {
+      "license": "Apache-2.0",
+      "kind": "upstream-source",
+      "file": "jake-10.9.4.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "source": "https://raw.githubusercontent.com/jakejs/jake/v10.9.4/LICENSE",
+      "integrity": "sha512-wpHYzhxiVQL+IV05BLE2Xn34zW1S223hvjtqk0+gsPrwd/8JNLXJgZZM/iPFsYc1xyphF+6M6EvdE5E9MBGkDA=="
+    },
+    "keyv@4.5.4": {
+      "license": "MIT",
+      "kind": "declared-standard",
+      "standard": "MIT",
+      "source": "https://registry.npmjs.org/keyv/4.5.4",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "author": "Jared Wray",
+      "integrity": "sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw=="
+    },
+    "lazy-val@1.0.5": {
+      "license": "MIT",
+      "kind": "declared-standard",
+      "standard": "MIT",
+      "source": "https://registry.npmjs.org/lazy-val/1.0.5",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "author": "Vladimir Krivosheev",
+      "integrity": "sha512-0/BnGCCfyUMkBpeDgWihanIAF9JmZhHBgUhEqzvf+adhNGLoP6TaiI5oF8oyb3I45P+PcnrqihSf01M0l0G5+Q=="
+    },
+    "node-api-version@0.2.1": {
+      "license": "MIT",
+      "kind": "declared-standard",
+      "standard": "MIT",
+      "source": "https://registry.npmjs.org/node-api-version/0.2.1",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "author": "Tim Fish",
+      "integrity": "sha512-2xP/IGGMmmSQpI1+O/k72jF/ykvZ89JeuKX3TLJAYPDVLUalrshrLHkeVcCCZqG/eEa635cr8IBYzgnDvM2O8Q=="
+    },
+    "ohm-js@16.6.0": {
+      "license": "MIT",
+      "kind": "upstream-source",
+      "file": "ohm-js-16.6.0.txt",
+      "sha256": "082749795be5c96a76e99878b6ede8068e475b257fd540227a1a876a9d6f574a",
+      "source": "https://raw.githubusercontent.com/harc/ohm/v16.6.0/LICENSE",
+      "integrity": "sha512-X9P4koSGa7swgVQ0gt71UCYtkAQGOjciJPJAz74kDxWt8nXbH5HrDOQG6qBDH7SR40ktNv4x61BwpTDE9q4lRA=="
+    },
+    "read-binary-file-arch@1.0.6": {
+      "license": "MIT",
+      "kind": "declared-standard",
+      "standard": "MIT",
+      "source": "https://registry.npmjs.org/read-binary-file-arch/1.0.6",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "author": "Samuel Maddock",
+      "integrity": "sha512-BNg9EN3DD3GsDXX7Aa8O4p92sryjkmzYYgmgTAc6CA4uGLEDzFfxOxugu21akOxpcXHiEgsYkC6nPsQvLLLmEg=="
+    },
+    "temp-file@3.4.0": {
+      "license": "MIT",
+      "kind": "declared-standard",
+      "standard": "MIT",
+      "source": "https://registry.npmjs.org/temp-file/3.4.0",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "author": "Vladimir Krivosheev",
+      "integrity": "sha512-C5tjlC/HCtVUOi3KWVokd4vHVViOmGjtLwIh4MuzPo/nMYTV/p1urt3RnMz2IWXDdKEGJH3k5+KPxtqRsUYGtg=="
+    },
+    "tmp-promise@3.0.3": {
+      "license": "MIT",
+      "kind": "declared-standard",
+      "standard": "MIT",
+      "source": "https://registry.npmjs.org/tmp-promise/3.0.3",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "author": "Benjamin Gruenbaum and Collaborators.",
+      "integrity": "sha512-RwM7MoPojPxsOBYnyd2hy0bxtIlVrihNs9pj5SUvY8Zz1sQcQG2tG1hSr8PDxfgEB8RNKDhqbIlroIarSNDNsQ=="
+    },
+    "tr46@0.0.3": {
+      "license": "MIT",
+      "kind": "declared-standard",
+      "standard": "MIT",
+      "source": "https://registry.npmjs.org/tr46/0.0.3",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "author": "Sebastian Mayr",
+      "integrity": "sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw=="
+    },
+    "truncate-utf8-bytes@1.0.2": {
+      "license": "WTFPL",
+      "kind": "declared-standard",
+      "standard": "WTFPL",
+      "source": "https://registry.npmjs.org/truncate-utf8-bytes/1.0.2",
+      "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
+      "author": "Carl Xiong",
+      "integrity": "sha512-95Pu1QXQvruGEhv62XCMO3Mm90GscOCClvrIUwCM0PYOXK3kaF3l3sIHxx71ThJfcbM2O5Au6SO3AWCSEfW4mQ=="
+    }
+  },
+  "families": [
+    {
+      "prefix": "@esbuild/",
+      "version": "0.25.12",
+      "repository": "evanw/esbuild",
+      "license": "MIT",
+      "kind": "upstream-source",
+      "file": "esbuild-0.25.12.txt",
+      "sha256": "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681",
+      "source": "https://raw.githubusercontent.com/evanw/esbuild/208f539945b145e7c9d6d844290f81c3fe5af320/LICENSE.md",
+      "note": "Platform binary packages share this version of the project licence; the source is pinned to its published commit."
+    },
+    {
+      "prefix": "@rollup/rollup-",
+      "version": "4.64.12",
+      "repository": "rollup/rollup",
+      "license": "MIT",
+      "kind": "upstream-source",
+      "file": "rollup-4.64.12.txt",
+      "sha256": "ad457a6619017a7f47cdbead25a8ec61907818be3e0834f1885bdf6c3ddfb668",
+      "source": "https://raw.githubusercontent.com/rollup/rollup/78d43df94e2169414edb3827e3bcfe09fefb7ccc/LICENSE.md",
+      "note": "Platform binary packages share this version of the project licence; the source is pinned to its published commit. Trailing whitespace is removed; licence wording and copyright notices are unchanged.",
+      "sourceSha256": "fa1bd040c5bdeefe65b3821cebf474f2733ce65df13089bd151dda1778e62fe8"
+    },
+    {
+      "prefix": "@esbuild/",
+      "version": "0.28.2",
+      "repository": "evanw/esbuild",
+      "license": "MIT",
+      "kind": "upstream-source",
+      "file": "esbuild-0.28.2.txt",
+      "sha256": "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681",
+      "source": "https://raw.githubusercontent.com/evanw/esbuild/609683d892977362a0f99026cb74b96263d728a9/LICENSE.md",
+      "note": "Platform binary packages share this version of the project licence; the source is pinned to its published commit."
+    }
+  ],
+  "metadata": {
+    "json-query@2.2.2": {
+      "license": "MIT",
+      "evidenceFile": "LICENSE",
+      "sha256": "8008c285a4c204b6ea14182f628e6cfedefa45c6ce7b68d4fe45bac231026e57",
+      "integrity": "sha512-y+IcVZSdqNmS4fO8t1uZF6RMMs0xh3SrTjJr9bp1X3+v0Q13+7Cyv12dSmKwDswp/H427BVtpkLWhGxYu3ZWRA==",
+      "source": "https://registry.npmjs.org/json-query/2.2.2",
+      "note": "The included MIT grant supplies the licence omitted from package metadata.",
+      "declaredLicense": null
+    },
+    "tv4@1.3.0": {
+      "license": "LicenseRef-tv4-public-domain",
+      "evidenceFile": "LICENSE.txt",
+      "sha256": "de04394aeb04453397eebd65dbea06a9db9e0c7b920415100489f06f2a3a78a0",
+      "integrity": "sha512-afizzfpJgvPr+eDkREK4MxJ/+r8nEEHcmitwgnPUqpaP+FpwQyadnxNoSACbgc/b1LsZYtODGoPiFxQrgJgjvw==",
+      "source": "https://registry.npmjs.org/tv4/1.3.0",
+      "note": "The included notice explicitly releases this version into the public domain; legacy metadata also offers MIT. The included public-domain notice is retained.",
+      "declaredLicense": [
+        {
+          "type": "Public Domain",
+          "url": "http://geraintluff.github.io/tv4/LICENSE.txt"
+        },
+        {
+          "type": "MIT",
+          "url": "http://jsonary.com/LICENSE.txt"
+        }
+      ]
+    },
+    "caniuse-lite@1.0.30001817": {
+      "license": "CC-BY-4.0",
+      "evidenceFile": "LICENSE",
+      "sha256": "fd3a263fe19ed8faa9068b43abaebafc02c77897b0c6fc09abc04bb592e5f16e",
+      "integrity": "sha512-uZ1JG80BwhtMalIAGPxPfmNhHyd/B/nTdr3hITWlRamSyAdUStP1Gop01e7SD5q6J90ixJvWDbvmiFVfDgn4bw==",
+      "source": "https://registry.npmjs.org/caniuse-lite/1.0.30001817",
+      "note": "Browser support data under attribution-only CC BY 4.0. This review is restricted to this package version and included licence text.",
+      "declaredLicense": "CC-BY-4.0"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+name: Feature request
+description: Describe a workflow problem and the behaviour that would help.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the workflow with synthetic examples and explain any current workaround.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested behaviour
+      description: Include alternatives and why they do not meet the need. A request does not guarantee implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Platform and context
+      description: Include the Yept version, operating system and whether this affects existing collections.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: My examples and attachments contain no credentials, real collections or private business data.
+          required: true

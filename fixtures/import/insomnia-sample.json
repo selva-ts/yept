@@ -1,0 +1,25 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-10-01T00:00:00.000Z",
+  "__export_source": "insomnia.desktop.app:v10.0.0",
+  "resources": [
+    { "_id": "wrk_1", "parentId": null, "name": "Sample Insomnia Travel", "_type": "workspace" },
+    { "_id": "env_base", "parentId": "wrk_1", "name": "Base Environment", "data": { "baseUrl": "http://localhost:4010" }, "_type": "environment" },
+    { "_id": "env_dev", "parentId": "env_base", "name": "dev", "data": { "baseUrl": "http://localhost:4010", "clientId": "sample-client" }, "_type": "environment" },
+    { "_id": "fld_auth", "parentId": "wrk_1", "name": "Auth", "_type": "request_group" },
+    {
+      "_id": "req_login", "parentId": "fld_auth", "name": "Login", "method": "POST", "url": "{{ _.baseUrl }}/auth/token",
+      "body": { "mimeType": "application/x-www-form-urlencoded", "params": [{ "name": "grant_type", "value": "client_credentials" }] },
+      "headers": [{ "name": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+      "authentication": { "type": "basic", "username": "{{ _.clientId }}", "password": "{{ _.clientSecret }}" },
+      "_type": "request"
+    },
+    {
+      "_id": "req_list", "parentId": "wrk_1", "name": "List bookings", "method": "GET", "url": "{{ _.baseUrl }}/bookings",
+      "parameters": [{ "name": "status", "value": "all" }], "headers": [],
+      "authentication": { "type": "bearer", "token": "{{ _.accessToken }}" },
+      "_type": "request"
+    }
+  ]
+}

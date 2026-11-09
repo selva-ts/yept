@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "ES2023",
+      "DOM"
+    ],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "types": [
+      "vite/client"
+    ],
+    "paths": {
+      "@shared/*": [
+        "../../packages/core/src/shared/*"
+      ]
+    },
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "src/webview/**/*",
+    "../../packages/ui/src/env.d.ts",
+    "vite.config.ts",
+    "../../packages/ui/src/html-beautify.d.ts"
+  ]
+}

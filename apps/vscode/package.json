@@ -1,0 +1,431 @@
+{
+  "name": "yept-vscode",
+  "displayName": "Yept",
+  "description": "Local-first API client for Git: send requests, run collections and keep secrets out of commits, with plain YAML collections in your repository.",
+  "version": "0.9.0",
+  "publisher": "yept",
+  "preview": true,
+  "pricing": "Free",
+  "private": true,
+  "license": "MIT",
+  "author": "Selva Subramaniam",
+  "homepage": "https://github.com/selva-ts/yept/tree/main/apps/vscode#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/selva-ts/yept.git",
+    "directory": "apps/vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/selva-ts/yept/issues"
+  },
+  "engines": {
+    "vscode": "^1.101.0"
+  },
+  "categories": [
+    "Testing",
+    "Other"
+  ],
+  "keywords": [
+    "api",
+    "api client",
+    "rest",
+    "http",
+    "collections",
+    "opencollection",
+    "bruno",
+    "postman",
+    "insomnia",
+    "openapi",
+    "curl",
+    "environments",
+    "git",
+    "secrets"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "icon": "media/yept-icon.png",
+  "galleryBanner": {
+    "color": "#111B30",
+    "theme": "dark"
+  },
+  "main": "./dist/extension.cjs",
+  "activationEvents": [
+    "onView:yept.collections",
+    "onView:yept.history",
+    "onView:yept.devtools"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "In untrusted folders Yept sends requests but doesn't run pre-request or post-response scripts, post-response vars, assertions or tests."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Yept reads collections, environments and Git from local files."
+    }
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "yept",
+          "title": "Yept",
+          "icon": "media/yept-activity-bar.svg"
+        }
+      ],
+      "panel": [
+        {
+          "id": "yept-devtools",
+          "title": "Yept",
+          "icon": "media/yept-activity-bar.svg"
+        }
+      ]
+    },
+    "views": {
+      "yept": [
+        {
+          "id": "yept.collections",
+          "name": "Collections"
+        },
+        {
+          "id": "yept.history",
+          "name": "History"
+        }
+      ],
+      "yept-devtools": [
+        {
+          "type": "webview",
+          "id": "yept.devtools",
+          "name": "Dev Tools"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "yept.collections",
+        "contents": "Open a folder to work with API collections.\n[Open Folder](command:vscode.openFolder)",
+        "when": "!yept.remote && !yept.hasLocalFolder"
+      },
+      {
+        "view": "yept.collections",
+        "contents": "Create a collection or open an existing one.\n[New Collection](command:yept.newCollection)\n[Open Collection](command:yept.openCollection)\n[Import Collection](command:yept.importCollection)",
+        "when": "!yept.remote && yept.hasLocalFolder && !yept.hasCollections"
+      },
+      {
+        "view": "yept.collections",
+        "contents": "Yept doesn't support remote windows (WSL, SSH, containers, Codespaces) yet. Open the folder in a local VS Code window to use it.",
+        "when": "yept.remote"
+      },
+      {
+        "view": "yept.history",
+        "contents": "Yept doesn't support remote windows yet.",
+        "when": "yept.remote"
+      }
+    ],
+    "commands": [
+      {
+        "command": "yept.open",
+        "title": "Open",
+        "category": "Yept"
+      },
+      {
+        "command": "yept.selectEnvironment",
+        "title": "Select Environment",
+        "category": "Yept"
+      },
+      {
+        "command": "yept.manageEnvironments",
+        "title": "Manage Environments",
+        "category": "Yept"
+      },
+      {
+        "command": "yept.diagnostics",
+        "title": "Run Diagnostics",
+        "category": "Yept"
+      },
+      {
+        "command": "yept.openRequest",
+        "title": "Open Request",
+        "category": "Yept"
+      },
+      {
+        "command": "yept.newRequest",
+        "title": "New Request",
+        "category": "Yept",
+        "icon": "$(add)"
+      },
+      {
+        "command": "yept.newFolder",
+        "title": "New Folder",
+        "category": "Yept",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "yept.rename",
+        "title": "Rename",
+        "category": "Yept"
+      },
+      {
+        "command": "yept.duplicate",
+        "title": "Duplicate",
+        "category": "Yept"
+      },
+      {
+        "command": "yept.delete",
+        "title": "Delete",
+        "category": "Yept"
+      },
+      {
+        "command": "yept.newCollection",
+        "title": "New Collection",
+        "category": "Yept",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "yept.openCollection",
+        "title": "Open Collection",
+        "category": "Yept",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "yept.importCollection",
+        "title": "Import Collection",
+        "category": "Yept",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "yept.exportCollection",
+        "title": "Export Collection",
+        "category": "Yept"
+      },
+      {
+        "command": "yept.pasteCurl",
+        "title": "Paste cURL",
+        "category": "Yept"
+      },
+      {
+        "command": "yept.history.open",
+        "title": "Open Run",
+        "category": "Yept",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "yept.history.restore",
+        "title": "Restore Request",
+        "category": "Yept",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "yept.runCollection",
+        "title": "Run Collection",
+        "category": "Yept",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "yept.runFolder",
+        "title": "Run Folder",
+        "category": "Yept",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "yept.showRunner",
+        "title": "Show Collection Run",
+        "category": "Yept"
+      },
+      {
+        "command": "yept.showDevTools",
+        "title": "Show Dev Tools",
+        "category": "Yept"
+      },
+      {
+        "command": "yept.checkLeaks",
+        "title": "Check for Leaked Secrets",
+        "category": "Yept"
+      },
+      {
+        "command": "yept.installLeakHook",
+        "title": "Install Pre-commit Leak Check Hook",
+        "category": "Yept"
+      },
+      {
+        "command": "yept.removeLeakHook",
+        "title": "Remove Pre-commit Leak Check Hook",
+        "category": "Yept"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "yept.newRequest",
+          "when": "view == yept.collections",
+          "group": "navigation@1"
+        },
+        {
+          "command": "yept.newCollection",
+          "when": "view == yept.collections",
+          "group": "navigation@2"
+        },
+        {
+          "command": "yept.openCollection",
+          "when": "view == yept.collections",
+          "group": "navigation@3"
+        },
+        {
+          "command": "yept.importCollection",
+          "when": "view == yept.collections",
+          "group": "yept@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "yept.newRequest",
+          "when": "view == yept.collections && (viewItem == collection || viewItem == folder)",
+          "group": "inline"
+        },
+        {
+          "command": "yept.newFolder",
+          "when": "view == yept.collections && (viewItem == collection || viewItem == folder)",
+          "group": "yept@1"
+        },
+        {
+          "command": "yept.rename",
+          "when": "view == yept.collections && (viewItem == request || viewItem == folder)",
+          "group": "yept@2"
+        },
+        {
+          "command": "yept.duplicate",
+          "when": "view == yept.collections && viewItem == request",
+          "group": "yept@3"
+        },
+        {
+          "command": "yept.delete",
+          "when": "view == yept.collections && (viewItem == request || viewItem == folder)",
+          "group": "yept@4"
+        },
+        {
+          "command": "yept.pasteCurl",
+          "when": "view == yept.collections && (viewItem == collection || viewItem == folder)",
+          "group": "yept@1"
+        },
+        {
+          "command": "yept.exportCollection",
+          "when": "view == yept.collections && (viewItem == collection || viewItem == collection.readOnly)",
+          "group": "io@1"
+        },
+        {
+          "command": "yept.newCollection",
+          "when": "view == yept.collections && viewItem == workspace",
+          "group": "yept"
+        },
+        {
+          "command": "yept.importCollection",
+          "when": "view == yept.collections && viewItem == workspace",
+          "group": "yept"
+        },
+        {
+          "command": "yept.selectEnvironment",
+          "when": "view == yept.collections && viewItem == collection",
+          "group": "yept@1"
+        },
+        {
+          "command": "yept.manageEnvironments",
+          "when": "view == yept.collections && viewItem == collection",
+          "group": "yept@2"
+        },
+        {
+          "command": "yept.runCollection",
+          "when": "view == yept.collections && (viewItem == collection || viewItem == collection.readOnly)",
+          "group": "run@1"
+        },
+        {
+          "command": "yept.runFolder",
+          "when": "view == yept.collections && (viewItem == folder || viewItem == folder.readOnly)",
+          "group": "run@1"
+        },
+        {
+          "command": "yept.history.restore",
+          "when": "view == yept.history && viewItem == run",
+          "group": "inline"
+        },
+        {
+          "command": "yept.history.open",
+          "when": "view == yept.history && viewItem == run",
+          "group": "yept@1"
+        },
+        {
+          "command": "yept.history.restore",
+          "when": "view == yept.history && viewItem == run",
+          "group": "yept@2"
+        }
+      ],
+      "commandPalette": [
+        { "command": "yept.newFolder", "when": "false" },
+        { "command": "yept.rename", "when": "false" },
+        { "command": "yept.duplicate", "when": "false" },
+        { "command": "yept.delete", "when": "false" },
+        { "command": "yept.history.open", "when": "false" },
+        { "command": "yept.history.restore", "when": "false" },
+        { "command": "yept.runFolder", "when": "false" },
+        { "command": "yept.showRunner", "when": "false" }
+      ]
+    },
+    "keybindings": [
+      { "command": "yept.rename", "key": "f2", "when": "focusedView == yept.collections && !inputFocus" },
+      { "command": "yept.delete", "key": "delete", "mac": "cmd+backspace", "when": "focusedView == yept.collections && !inputFocus" }
+    ],
+    "configuration": {
+      "title": "Yept",
+      "properties": {
+        "yept.cookies.automatic": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Keep cookies from responses and send them with later requests to the same site, per collection and environment. Stored encrypted on this machine."
+        },
+        "yept.history.runsPerRequest": {
+          "type": "integer",
+          "default": 20,
+          "minimum": 1,
+          "maximum": 500,
+          "description": "Responses kept in history for each request."
+        },
+        "yept.history.maxSizeMb": {
+          "type": "number",
+          "default": 500,
+          "minimum": 10,
+          "maximum": 20000,
+          "description": "Total size of the response history, in MB. The oldest entries go first."
+        },
+        "yept.history.bodyLimitMb": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 50,
+          "description": "Largest response body kept in history, in MB. Larger bodies are recorded without their content. 0 keeps no bodies."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "npm run notices --prefix ../.. && node esbuild.mjs && vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.webview.json",
+    "test": "npm run typecheck && npm run build && node test/run.mjs",
+    "measure": "npm run build && node test/measure.mjs",
+    "package": "npx --yes @vscode/vsce@4.0.0 package --pre-release --no-dependencies --out out/yept-vscode.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "24.12.0",
+    "@types/vscode": "1.101.0",
+    "@vscode/test-electron": "3.1.0",
+    "esbuild": "0.25.12",
+    "typescript": "6.0.3",
+    "vite": "7.3.7"
+  },
+  "dependencies": {
+    "@yept/core": "0.9.0",
+    "@yept/ui": "0.9.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "monaco-editor": "0.57.0"
+  }
+}

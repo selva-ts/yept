@@ -1,0 +1,13 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Yept extension",
+      "type": "npm",
+      "script": "build",
+      "path": "apps/vscode",
+      "problemMatcher": [],
+      "group": "build"
+    }
+  ]
+}

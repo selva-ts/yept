@@ -1,0 +1,63 @@
+{
+  "name": "yept",
+  "version": "0.9.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Free, local-first, Git-native desktop API client built on Bruno's open-source packages",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "npm run notices && electron-vite dev",
+    "build": "npm run notices && electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck --workspace yept-vscode",
+    "notices": "node scripts/generate-notices.mjs",
+    "check:licenses": "npm run notices && node scripts/check-licenses.mjs",
+    "icons": "electron apps/desktop/src/host/generate-icons.cjs",
+    "package:win": "npm run build && electron-builder --win nsis",
+    "package:mac": "npm run build && electron-builder --mac",
+    "package:mac-zip": "npm run build && electron-builder --mac zip",
+    "fixture-server": "node fixtures/server/server.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "npm run build && node e2e/home.mjs && node e2e/requests.mjs && node e2e/environments.mjs && node e2e/history-tests.mjs && node e2e/git-import.mjs && node e2e/git-sync.mjs && node e2e/devtools.mjs && node e2e/script-requests.mjs && node e2e/collection-runner.mjs && node e2e/response-cookies.mjs && node e2e/oauth2.mjs && node e2e/multipart.mjs && node e2e/response-html.mjs && node e2e/appearance.mjs && node e2e/about.mjs"
+  },
+  "dependencies": {
+    "@usebruno/common": "0.26.0",
+    "@usebruno/converters": "0.24.0",
+    "@usebruno/filestore": "0.13.0",
+    "@usebruno/js": "0.54.0",
+    "@usebruno/requests": "file:shims/usebruno-requests",
+    "axios": "1.20.0",
+    "chokidar": "5.0.0",
+    "follow-redirects": "1.16.1",
+    "js-yaml": "4.3.1",
+    "qs": "6.16.1",
+    "tough-cookie": "6.0.2"
+  },
+  "main": "out/main/index.js",
+  "author": "Selva Subramaniam",
+  "devDependencies": {
+    "@monaco-editor/react": "4.7.0",
+    "@types/js-yaml": "4.0.9",
+    "@types/node": "24.12.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "5.2.0",
+    "electron": "43.7.7",
+    "electron-builder": "26.15.3",
+    "electron-vite": "5.0.0",
+    "monaco-editor": "0.57.0",
+    "playwright": "1.63.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "typescript": "6.0.3",
+    "vite": "7.3.7",
+    "vitest": "5.0.3",
+    "zustand": "5.0.15"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ]
+}
