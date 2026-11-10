@@ -494,7 +494,7 @@ function HistoryPanel({ tab, onOpen, compare, onCompare, onPick }: { tab: Tab; o
         )}
       </div>
       {items.length === 0 && <p className="mute small" style={{ padding: '0 10px' }}>No runs yet. Every send is kept here (redacted), up to the limit in Settings.</p>}
-      {compare && <p className="mute small compare-hint">{compare.length < 2 ? `Pick ${2 - compare.length} more run${compare.length ? '' : 's'} to compare.` : 'Pick another run to change the comparison.'}</p>}
+      {compare && <p className="mute small compare-hint">{compare.length === 0 ? 'Pick two runs to compare.' : compare.length === 1 ? 'Pick one more run.' : 'Pick another run to change the pair.'}</p>}
       {items.map((h: HistorySummary) => (
         <button
           key={h.runId}
