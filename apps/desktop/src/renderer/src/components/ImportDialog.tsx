@@ -105,7 +105,7 @@ export function ImportDialog(): React.JSX.Element | null {
             <>
               <h4 className="section-title">Credentials found ({p.findings.length})</h4>
               <p className="mute small" style={{ margin: '0 0 6px' }}>
-                Ticked values are replaced by a {'{{variable}}'} marked secret in the environments, and the value is stored as a local secret on this machine, not in the files.
+                OAuth2 credentials and any other ticked values are stored as local secrets. The files contain {'{{variable}}'} references.
               </p>
               <table className="headers-list">
                 <tbody>
@@ -115,6 +115,7 @@ export function ImportDialog(): React.JSX.Element | null {
                         <input
                           type="checkbox"
                           checked={fix.has(f.id)}
+                          disabled={f.required}
                           onChange={(e) =>
                             setFix((s) => {
                               const n = new Set(s);

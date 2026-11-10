@@ -131,7 +131,7 @@ For the installed build, run `dist\Yept-Setup-0.9.0.exe` instead of `npm run dev
 | A teammate renames and edits a request you have sent before (open in a tab); Pull | The output lists the rename; the tab stays open on the new name; its History keeps the earlier runs | |
 | Switch to a branch where a request was renamed, then back | History and the open tab follow both ways | |
 
-## H. OAuth2 client credentials
+## H. OAuth2
 
 | Check | Expected | Result |
 |---|---|---|
@@ -139,6 +139,9 @@ For the installed build, run `dist\Yept-Setup-0.9.0.exe` instead of `npm run dev
 | Switch environment | The token panel names the new environment; no token is shared between environments | |
 | Restart Yept | The Auth tab shows no token; the next send gets one | |
 | Open the same collection in Bruno after saving | Bruno shows the OAuth2 client credentials settings unchanged | |
+| Use **Get token** with an authorization-code provider registered for a loopback callback | The system browser opens, the callback completes on the expected port and the Auth tab shows Ready. Check both desktop and VS Code. | |
+| Cancel an authorization-code sign-in in Yept, then try again | Yept stops waiting, releases the callback port and the next attempt starts a fresh sign-in. | |
+| Use a provider that issues a refresh token | An expired token renews without opening the browser. Turn automatic renewal off and check that **Get token** is required. | |
 | Wrong client secret; Get token | The token endpoint's error is shown; the secret appears nowhere in the response, timeline or Dev tools | |
 
 ## H2. Digest, NTLM and AWS Signature v4

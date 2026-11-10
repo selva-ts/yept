@@ -9,6 +9,7 @@ export interface HostOptions {
   openDialog?: AppHost['openDialog'];
   saveDialog?: AppHost['saveDialog'];
   trash?: AppHost['trash'];
+  openAuthorizationUrl?: AppHost['openAuthorizationUrl'];
 }
 
 export async function createHost(storage: string, extensionPath: string, version: string, versions: Record<string, string>, writeClipboard: (text: string) => void, emit: AppHost['emit'], options: HostOptions = {}): Promise<AppHost> {
@@ -20,6 +21,6 @@ export async function createHost(storage: string, extensionPath: string, version
     writeClipboard, emit, cipher: options.cipher ?? unavailableCipher('no secret storage is connected'),
     openDialog: options.openDialog ?? unavailable, trash: options.trash ?? unavailable,
     notices: unavailable, selfTest: unavailable, saveDialog: options.saveDialog ?? unavailable,
-    openExternal: unavailable, applyAppearance: () => {}, metrics: () => []
+    openExternal: unavailable, openAuthorizationUrl: options.openAuthorizationUrl, applyAppearance: () => {}, metrics: () => []
   };
 }

@@ -9,9 +9,12 @@ export { AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, DIGEST_PASSWORD, DIGEST_USER,
 
 export const CLIENT_ID = 'sample-client';
 export const CLIENT_SECRET = 'sample-secret';
+export const OAUTH_USER = 'sample-user';
+export const OAUTH_PASSWORD = 'sample-password';
 
 const issuedTokens = new Set();
 let tokenRequests = 0;
+const tokenGrants = {};
 let lastUpload = null;
 const htmlHits = {};
 const created = new Map();
@@ -100,28 +103,64 @@ function bearerOk(req) {
 }
 
 export function createFixtureServer() {
+  const authorizationCodes = new Map();
+  const refreshTokens = new Set();
   return http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://fixture.local');
     const raw = await readBody(req);
     const body = raw.toString('utf8');
     let m;
 
-    // OAuth2 client-credentials token endpoint. Credentials in a Basic header or in the form body.
+    if (req.method === 'GET' && url.pathname === '/auth/authorize') {
+      const query = url.searchParams;
+      const redirect = new URL(query.get('redirect_uri') || 'http://invalid.example.test');
+      if (!['127.0.0.1', 'localhost'].includes(redirect.hostname) || query.get('response_type') !== 'code' ||
+        query.get('client_id') !== CLIENT_ID || query.get('code_challenge_method') !== 'S256' || !query.get('code_challenge')) {
+        return send(res, 400, { error: 'invalid_request' });
+      }
+      const code = randomUUID();
+      authorizationCodes.set(code, { redirect: redirect.href, challenge: query.get('code_challenge') });
+      redirect.searchParams.set('code', code);
+      redirect.searchParams.set('state', query.has('wrong_state') ? 'wrong-state' : query.get('state'));
+      return send(res, 302, '', { Location: redirect.href });
+    }
+    // OAuth2 token endpoint. Credentials in a Basic header or in the form body.
     // ?expires_in=N sets the token lifetime (default 3600); the scope asked for is echoed back.
     if (req.method === 'POST' && url.pathname === '/auth/token') {
       tokenRequests++;
       const basic = /^Basic (.+)$/.exec(req.headers.authorization ?? '');
       const form = new URLSearchParams(body);
       const [id, secret] = basic ? Buffer.from(basic[1], 'base64').toString().split(':') : [form.get('client_id'), form.get('client_secret')];
-      if (id !== CLIENT_ID || secret !== CLIENT_SECRET) return send(res, 401, { error: 'invalid_client', error_description: 'Unknown client or wrong secret' });
-      if (form.get('grant_type') !== 'client_credentials') return send(res, 400, { error: 'unsupported_grant_type' });
+      const grant = form.get('grant_type');
+      tokenGrants[grant] = (tokenGrants[grant] ?? 0) + 1;
+      const publicClient = !secret && (grant === 'authorization_code' || grant === 'refresh_token');
+      if (id !== CLIENT_ID || (!publicClient && secret !== CLIENT_SECRET)) return send(res, 401, { error: 'invalid_client', error_description: 'Unknown client or wrong secret' });
+      if (grant === 'authorization_code') {
+        const code = form.get('code');
+        const saved = authorizationCodes.get(code);
+        authorizationCodes.delete(code);
+        const challenge = createHash('sha256').update(form.get('code_verifier') || '').digest('base64url');
+        if (!saved || saved.redirect !== form.get('redirect_uri') || saved.challenge !== challenge) {
+          return send(res, 400, { error: 'invalid_grant', error_description: `Rejected code ${code}` });
+        }
+      } else if (grant === 'password') {
+        if (form.get('username') !== OAUTH_USER || form.get('password') !== OAUTH_PASSWORD) {
+          return send(res, 400, { error: 'invalid_grant', error_description: `Rejected password ${form.get('password')}` });
+        }
+      } else if (grant === 'refresh_token') {
+        if (!refreshTokens.delete(form.get('refresh_token')) || url.searchParams.has('reject_refresh')) {
+          return send(res, 400, { error: 'invalid_grant', error_description: `Rejected token ${form.get('refresh_token')}` });
+        }
+      } else if (grant !== 'client_credentials') return send(res, 400, { error: 'unsupported_grant_type' });
       const token = randomUUID();
       issuedTokens.add(token);
       const scope = form.get('scope');
-      return send(res, 200, { access_token: token, token_type: 'Bearer', expires_in: Number(url.searchParams.get('expires_in') ?? 3600), ...(scope ? { scope } : {}) });
+      const refresh = grant !== 'client_credentials' || url.searchParams.has('refresh') ? randomUUID() : undefined;
+      if (refresh) refreshTokens.add(refresh);
+      return send(res, 200, { access_token: token, refresh_token: refresh, token_type: 'Bearer', expires_in: Number(url.searchParams.get('expires_in') ?? 3600), ...(scope ? { scope } : {}) });
     }
     // Token requests so far, for tests that check a cached token is reused.
-    if (url.pathname === '/auth/stats') return send(res, 200, { tokenRequests });
+    if (url.pathname === '/auth/stats') return send(res, 200, { tokenRequests, tokenGrants });
     // Invalidates every issued token, as a server-side revocation would.
     if (req.method === 'POST' && url.pathname === '/auth/revoke') {
       issuedTokens.clear();

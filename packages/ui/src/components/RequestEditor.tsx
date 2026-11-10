@@ -262,7 +262,7 @@ export function RequestEditor({ tab }: { tab: Tab }): React.JSX.Element {
               collectionId={tab.collectionId}
               inheritedLabel={preview ? `${preview.auth.mode === 'none' ? 'no auth' : preview.auth.mode === 'oauth2' ? 'OAuth2' : `${preview.auth.mode} auth`} from ${preview.authFrom}` : undefined}
             />
-            {preview?.auth.mode === 'oauth2' && <OAuth2Token tab={tab} autoFetch={preview.auth.oauth2.autoFetchToken} />}
+            {preview?.auth.mode === 'oauth2' && <OAuth2Token tab={tab} config={preview.auth.oauth2} />}
           </div>
         )}
 

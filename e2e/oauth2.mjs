@@ -1,12 +1,11 @@
-// End-to-end: OAuth2 client credentials. Auth tab fields, token status, Get token and Forget token, the token cached
-// between sends, one automatic retry of a GET after a 401, no automatic re-send of a POST, masking and the saved file.
+// End-to-end: OAuth2 client credentials, legacy password, and browser authorization code with PKCE.
 // Usage: npm run build && node e2e/oauth2.mjs   (screenshots go to e2e/out/, which is git-ignored)
 import { _electron as electron } from 'playwright';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createFixtureServer, CLIENT_ID, CLIENT_SECRET } from '../fixtures/server/server.mjs';
+import { createFixtureServer, CLIENT_ID, CLIENT_SECRET, OAUTH_USER, OAUTH_PASSWORD } from '../fixtures/server/server.mjs';
 import { waitForFile } from './wait.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -25,6 +24,7 @@ await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
 const tokenRequests = async () => (await (await fetch(`${base}/auth/stats`)).json()).tokenRequests;
 const revokeAll = () => fetch(`${base}/auth/revoke`, { method: 'POST' });
+const grantCount = async (grant) => (await (await fetch(`${base}/auth/stats`)).json()).tokenGrants[grant] ?? 0;
 
 const results = [];
 const check = (name, ok, detail = '') => {
@@ -60,7 +60,7 @@ try {
   // 1. Auth tab: OAuth2 client credentials fields.
   await page.locator('.subtab', { hasText: 'Auth' }).first().click();
   await page.getByLabel('Auth type').selectOption('oauth2');
-  await page.getByLabel('Token URL').fill(`${base}/auth/token`);
+  await page.getByLabel('Token URL', { exact: true }).fill(`${base}/auth/token`);
   await page.getByLabel('Client ID').fill(CLIENT_ID);
   await page.getByLabel('Client secret').fill(CLIENT_SECRET);
   await page.getByLabel('Scope').fill('bookings.read');
@@ -127,15 +127,49 @@ try {
   await shot('03-console');
   await page.keyboard.press('Control+Shift+J');
 
-  // 8. Saved as Bruno's OAuth2 client credentials, with the literal secret flagged on save.
+  // 8. Store the client secret locally before saving the Bruno file.
+  await page.getByLabel('Environment', { exact: true }).selectOption('local');
+  await page.getByRole('button', { name: 'Store as local secret', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Store secret', exact: true }).click();
+  await page.getByLabel('Client secret').waitFor();
+  await page.waitForFunction(() => document.querySelector('input[aria-label="Client secret"]').value === '{{clientSecret}}');
   await page.keyboard.press('Control+s');
   const file = await waitForFile(join(wsDir, 'sample-travel', 'OAuth bookings.yml'), (text) => text.includes('scope: bookings.read'));
-  check('saved as OAuth2 client credentials', file.includes('type: oauth2') && file.includes('flow: client_credentials') && file.includes('scope: bookings.read'), file.split('\n').slice(9, 16).join(' | '));
+  check('saved as OAuth2 client credentials with a local secret reference', file.includes('flow: client_credentials') && file.includes('{{clientSecret}}') && !file.includes(CLIENT_SECRET));
 
   // 9. Dark theme.
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.locator('.subtab', { hasText: 'Auth' }).first().click();
   await shot('04-dark');
+
+  // 10. Password grant and silent renewal with a refresh token.
+  await page.getByLabel('OAuth2 grant type').selectOption('password');
+  await page.getByLabel('OAuth2 username').fill(OAUTH_USER);
+  await page.getByLabel('OAuth2 password').fill(OAUTH_PASSWORD);
+  await page.getByRole('button', { name: 'Store as local secret', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Store secret', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('input[aria-label="OAuth2 password"]').value === '{{oauthPassword}}');
+  const passwordBefore = await grantCount('password');
+  const refreshBefore = await grantCount('refresh_token');
+  await send(200);
+  await revokeAll();
+  await send(200);
+  check('password grant sends and renews after a 401', (await grantCount('password')) === passwordBefore + 1 && (await grantCount('refresh_token')) === refreshBefore + 1 && (await statusMetric()).includes('OAuth2: renewed after 401'));
+  check('OAuth2 password stays out of the visible response', !(await page.locator('.response').innerText()).includes(OAUTH_PASSWORD));
+
+  // 11. Drive the same loopback redirect the system browser would follow.
+  await app.evaluate(({ shell }) => { shell.openExternal = async (url) => { await fetch(url); }; });
+  await page.getByLabel('OAuth2 grant type').selectOption('authorization_code');
+  await page.getByLabel('Authorization URL').fill(`${base}/auth/authorize`);
+  await page.getByLabel('Client secret').fill('');
+  const codeBefore = await grantCount('authorization_code');
+  await page.keyboard.press('Control+Enter');
+  await page.getByText(/Use Get token in the Auth tab to sign in/).first().waitFor({ timeout: 10000 });
+  check('sending before sign-in does not start the authorization flow', (await grantCount('authorization_code')) === codeBefore);
+  await tokenPanel().getByRole('button', { name: 'Get token', exact: true }).click();
+  await tokenPanel().getByText(/^Ready/).waitFor({ timeout: 10000 });
+  await send(200);
+  check('authorization code with PKCE completes over loopback and sends', (await grantCount('authorization_code')) === codeBefore + 1 && (await statusMetric()).includes('OAuth2: cached token'));
 } catch (e) {
   check('scenario completed', false, e.message.split('\n')[0]);
   await shot('99-failure').catch(() => {});

@@ -27,6 +27,8 @@ export interface AppHost {
   saveDialog(options: SaveDialogOptions): Promise<{ canceled: boolean; filePath?: string }>;
   trash(path: string): Promise<void>;
   openExternal(url: string): void;
+  /** Opens a validated OAuth2 authorization URL and reports whether the browser opened. */
+  openAuthorizationUrl?(url: string): Promise<void>;
   writeClipboard(text: string): void;
   cipher: Cipher;
   applyAppearance(appearance: Appearance): void;

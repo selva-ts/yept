@@ -292,8 +292,8 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
   handle('oauth2:token', 3, async (id, doc, action) => {
     request(id);
     requestDoc(doc);
-    if (!['status', 'fetch', 'forget'].includes(action)) throw new Error('Invalid token action');
-    return runs.oauth2Token(await ws().requestContext(id), doc, action);
+    if (!['status', 'fetch', 'forget', 'cancel'].includes(action)) throw new Error('Invalid token action');
+    return runs.oauth2Token(id, await ws().requestContext(id), doc, action);
   });
 
   // The collection runner: the saved requests under a collection or folder, one at a time, one run at a time.

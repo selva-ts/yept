@@ -10,6 +10,7 @@ import { utils as brunoUtils } from '@usebruno/common';
 import { stringifyCollectionFile } from '../workspace/bruno-adapter';
 import { atomicWrite } from '../fs/atomic-write';
 import { looksLikeSecret, type SecretField } from '../../shared/secrets';
+import { isOAuth2Grant, OAUTH2_AUTHORIZATION_CODE, type ImportSecretFinding } from '../../shared/model';
 import { fileNameOf, isAbsolutePath } from '../../shared/multipart';
 
 export type ImportFormat = 'postman' | 'insomnia' | 'openapi' | 'opencollection';
@@ -30,18 +31,7 @@ export interface ImportSource {
   issues: string[];
 }
 
-export interface SecretFinding {
-  id: string;
-  /** Request or environment name, for display. */
-  where: string;
-  field:
-    | 'bearer token' | 'basic password' | 'api key' | 'client secret' | 'digest password' | 'ntlm password' | 'aws secret access key' | 'aws session token'
-    | 'authorization header' | 'environment value';
-  /** Suggested {{variable}} name. */
-  variable: string;
-  /** Masked preview of the value. */
-  preview: string;
-}
+export type SecretFinding = ImportSecretFinding;
 
 export interface PlannedFile {
   /** Relative to the target collection folder, forward slashes. */
@@ -181,14 +171,29 @@ function restoreInsomniaFileFields(items: any[], files: Map<string, Map<string, 
 /** Insomnia's {{ _.name }} is Bruno's {{name}}. */
 const insomniaVars = (v: unknown): string => String(v ?? '').replace(/\{\{\s*_\.([^{}\s]+)\s*\}\}/g, '{{$1}}');
 
-/** Digest, NTLM and AWS (Insomnia calls it "iam") auth by request name, in Bruno's shape. */
-function insomniaAuth(data: any): Map<string, { mode: string; value: Record<string, string> }> {
-  const out = new Map<string, { mode: string; value: Record<string, string> }>();
+type ImportedAuth = { mode: string; value: Record<string, string | boolean> };
+
+/** Auth left out by the Insomnia converter, in Bruno's shape. */
+function insomniaAuth(data: any): Map<string, ImportedAuth> {
+  const out = new Map<string, ImportedAuth>();
   const visit = (node: any): void => {
     if (!node || typeof node !== 'object') return;
     if (Array.isArray(node)) return node.forEach(visit);
     const a = node.authentication;
     if (typeof node.name === 'string' && a && !a.disabled) {
+      if (a.type === 'oauth2' && isOAuth2Grant(a.grantType)) {
+        out.set(node.name, { mode: 'oauth2', value: {
+          grantType: a.grantType,
+          accessTokenUrl: insomniaVars(a.accessTokenUrl), refreshTokenUrl: insomniaVars(a.refreshTokenUrl),
+          clientId: insomniaVars(a.clientId), clientSecret: insomniaVars(a.clientSecret), scope: insomniaVars(a.scope),
+          credentialsPlacement: a.credentialsInBody === true || a.credentialsInBody === 'true' ? 'body' : 'basic_auth_header', tokenPlacement: 'header',
+          tokenHeaderPrefix: a.tokenPrefix === undefined ? 'Bearer' : insomniaVars(a.tokenPrefix),
+          autoFetchToken: true, autoRefreshToken: true,
+          ...(a.grantType === OAUTH2_AUTHORIZATION_CODE ? {
+            authorizationUrl: insomniaVars(a.authorizationUrl), callbackUrl: insomniaVars(a.redirectUrl), pkce: a.usePkce !== false
+          } : { username: insomniaVars(a.username), password: insomniaVars(a.password) })
+        } });
+      }
       if (a.type === 'digest') out.set(node.name, { mode: 'digest', value: { username: insomniaVars(a.username), password: insomniaVars(a.password) } });
       if (a.type === 'ntlm') out.set(node.name, { mode: 'ntlm', value: { username: insomniaVars(a.username), password: insomniaVars(a.password), domain: insomniaVars(a.domain) } });
       if (a.type === 'iam') {
@@ -205,7 +210,7 @@ function insomniaAuth(data: any): Map<string, { mode: string; value: Record<stri
 }
 
 /** Bruno's Insomnia converter imports only basic and bearer auth; the others arrive as no auth. */
-function restoreInsomniaAuth(items: any[], auth: Map<string, { mode: string; value: Record<string, string> }>): void {
+function restoreInsomniaAuth(items: any[], auth: Map<string, ImportedAuth>): void {
   eachRequest(items, (it) => {
     const a = auth.get(String(it.name));
     if (!a || !it.request || !['none', 'inherit', undefined].includes(it.request.auth?.mode)) return;
@@ -245,6 +250,7 @@ const AUTH_SECRETS: { mode: string; key: string; kind: SecretField; field: Secre
   { mode: 'basic', key: 'password', kind: 'password', field: 'basic password', variable: 'password' },
   { mode: 'apikey', key: 'value', kind: 'apikey', field: 'api key', variable: 'apiKey' },
   { mode: 'oauth2', key: 'clientSecret', kind: 'password', field: 'client secret', variable: 'clientSecret' },
+  { mode: 'oauth2', key: 'password', kind: 'password', field: 'OAuth2 password', variable: 'oauthPassword' },
   { mode: 'digest', key: 'password', kind: 'password', field: 'digest password', variable: 'digestPassword' },
   { mode: 'ntlm', key: 'password', kind: 'password', field: 'ntlm password', variable: 'ntlmPassword' },
   { mode: 'awsv4', key: 'secretAccessKey', kind: 'password', field: 'aws secret access key', variable: 'awsSecretAccessKey' },
@@ -256,28 +262,41 @@ const authSecret = (a: any, s: (typeof AUTH_SECRETS)[number]): string | undefine
   return a?.mode === s.mode && looksLikeSecret(v, s.kind) ? v : undefined;
 };
 
+/** Include collection and folder auth, which requests can inherit. */
+function visitAuth(model: CollectionModel, visit: (request: any, name: string) => void): void {
+  if (model.root?.request) visit(model.root.request, model.name);
+  const walk = (items: any[]): void => {
+    for (const it of items) {
+      if (it.type === 'folder') {
+        if (it.root?.request) visit(it.root.request, String(it.name));
+        walk(it.items ?? []);
+      } else if (it.request) visit(it.request, String(it.name));
+    }
+  };
+  walk(model.items);
+}
+
 /** Literal credentials in the imported data. Each can be replaced with a {{variable}} declared secret (value not written). */
 export function findSecrets(model: CollectionModel): SecretFinding[] {
   const out: SecretFinding[] = [];
+  const reserved = new Set(model.environments.flatMap((env) => (env.variables ?? []).map((v: any) => String(v.name))));
   let n = 0;
-  const visit = (items: any[]): void => {
-    for (const it of items) {
-      if (it.type === 'folder') {
-        visit(it.items ?? []);
-        continue;
+  visitAuth(model, (request, name) => {
+    for (const s of AUTH_SECRETS) {
+      const v = authSecret(request.auth, s);
+      if (v === undefined) continue;
+      let variable = s.variable;
+      const required = s.mode === 'oauth2';
+      if (required) {
+        for (let suffix = 2; reserved.has(variable); suffix++) variable = `${s.variable}${suffix}`;
+        reserved.add(variable);
       }
-      const a = it.request?.auth;
-      const name = String(it.name);
-      for (const s of AUTH_SECRETS) {
-        const v = authSecret(a, s);
-        if (v !== undefined) out.push({ id: `s${n++}`, where: name, field: s.field, variable: s.variable, preview: maskValue(v) });
-      }
-      for (const h of it.request?.headers ?? []) {
-        if (String(h.name).toLowerCase() === 'authorization' && looksLikeSecret(String(h.value ?? ''), 'header')) out.push({ id: `s${n++}`, where: name, field: 'authorization header', variable: 'accessToken', preview: maskValue(String(h.value)) });
-      }
+      out.push({ id: `s${n++}`, where: name, field: s.field, variable, preview: required ? '••••' : maskValue(v), ...(required ? { required } : {}) });
     }
-  };
-  visit(model.items);
+    for (const h of request.headers ?? []) {
+      if (String(h.name).toLowerCase() === 'authorization' && looksLikeSecret(String(h.value ?? ''), 'header')) out.push({ id: `s${n++}`, where: name, field: 'authorization header', variable: 'accessToken', preview: maskValue(String(h.value)) });
+    }
+  });
   for (const env of model.environments) {
     for (const v of env.variables ?? []) {
       if (!v.secret && v.value && SECRETISH_NAME.test(String(v.name))) out.push({ id: `s${n++}`, where: `environment "${env.name}"`, field: 'environment value', variable: String(v.name), preview: maskValue(String(v.value)) });
@@ -287,38 +306,35 @@ export function findSecrets(model: CollectionModel): SecretFinding[] {
 }
 
 /**
- * Applies the chosen secret fixes to the model: literals become {{variable}} references, variables are declared secret
+ * Applies the chosen secret fixes and always moves literal OAuth2 credentials to local storage.
+ * Literals become {{variable}} references, variables are declared secret
  * in every environment (no value), and the original values are returned so the caller can store them as local secrets.
  */
 export function applySecretFixes(model: CollectionModel, fixIds: Set<string>): { name: string; value: string; environment: string | null }[] {
   const values: { name: string; value: string; environment: string | null }[] = [];
   const declared = new Set<string>();
+  const findings = findSecrets(model);
   let n = 0;
-  const visit = (items: any[]): void => {
-    for (const it of items) {
-      if (it.type === 'folder') {
-        visit(it.items ?? []);
-        continue;
-      }
-      const a = it.request?.auth;
-      const take = (variable: string, value: string): string => {
-        declared.add(variable);
-        values.push({ name: variable, value, environment: null });
-        return `{{${variable}}}`;
-      };
-      for (const s of AUTH_SECRETS) {
-        const v = authSecret(a, s);
-        if (v !== undefined && fixIds.has(`s${n++}`)) a[s.mode][s.key] = take(s.variable, v);
-      }
-      for (const h of it.request?.headers ?? []) {
-        if (String(h.name).toLowerCase() === 'authorization' && looksLikeSecret(String(h.value ?? ''), 'header') && fixIds.has(`s${n++}`)) {
-          const m = /^(bearer|basic)\s+(.*)$/i.exec(String(h.value));
-          h.value = m ? `${m[1]} ${take('accessToken', m[2])}` : take('accessToken', String(h.value));
-        }
+  const take = (variable: string, value: string): string => {
+    declared.add(variable);
+    values.push({ name: variable, value, environment: null });
+    return `{{${variable}}}`;
+  };
+  visitAuth(model, (request) => {
+    const a = request.auth;
+    for (const s of AUTH_SECRETS) {
+      const v = authSecret(a, s);
+      if (v === undefined) continue;
+      const f = findings[n++];
+      if (f.required || fixIds.has(f.id)) a[s.mode][s.key] = take(f.variable, v);
+    }
+    for (const h of request.headers ?? []) {
+      if (String(h.name).toLowerCase() === 'authorization' && looksLikeSecret(String(h.value ?? ''), 'header') && fixIds.has(findings[n++].id)) {
+        const m = /^(bearer|basic)\s+(.*)$/i.exec(String(h.value));
+        h.value = m ? `${m[1]} ${take('accessToken', m[2])}` : take('accessToken', String(h.value));
       }
     }
-  };
-  visit(model.items);
+  });
   for (const env of model.environments) {
     for (const v of env.variables ?? []) {
       if (!v.secret && v.value && SECRETISH_NAME.test(String(v.name)) && fixIds.has(`s${n++}`)) {
@@ -423,7 +439,12 @@ export async function writePlan(plan: ImportPlan, policy: ConflictPolicy): Promi
 
 /** A single-file, bundled OpenCollection YAML of the collection. Secret values are never part of the model. */
 export function exportBundled(model: CollectionModel, includeEnvironments: boolean): string {
-  const oc = brunoToOpenCollection({ ...model, environments: includeEnvironments ? model.environments : [] });
+  const copy = structuredClone(model);
+  // Literal secrets become {{variables}}; an export doesn't gain an environment the collection didn't have.
+  const hadEnvironments = copy.environments.length > 0;
+  applySecretFixes(copy, new Set());
+  if (!hadEnvironments) copy.environments = [];
+  const oc = brunoToOpenCollection({ ...copy, environments: includeEnvironments ? copy.environments : [] });
   oc.bundled = true;
   if (!includeEnvironments && oc.config) delete oc.config.environments;
   return yaml.dump(oc, { lineWidth: -1, noRefs: true });
