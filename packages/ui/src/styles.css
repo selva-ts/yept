@@ -725,3 +725,28 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line); border-bottom-width
 .oauth2-token p { margin: 4px 0 8px; }
 .oauth2-token-actions { display: flex; gap: 8px; }
 .oauth2-note { margin: 0; }
+
+/* Response tools: JSONPath filter, set as variable, image and PDF preview, comparing stored runs. */
+.json-filter { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-top: 1px solid var(--line-soft); }
+.json-filter .input { flex: 0 1 420px; min-width: 160px; font-size: 12px; }
+.json-filter .spacer { flex: 1; }
+.json-filter-status { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46%; }
+.set-variable-value { flex: 1; min-width: 0; word-break: break-all; max-height: 120px; overflow: auto; padding: 4px 6px; border-radius: 4px; background: var(--code); border: 1px solid var(--line-soft); font: 12px var(--mono); }
+.set-variable label { display: inline-flex; gap: 6px; align-items: center; }
+.media-preview { background: #e9e9e9; }
+.history-item.picked { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.compare-hint { padding: 6px 10px; margin: 0; border-bottom: 1px solid var(--line-soft); }
+.history-compare { grid-row: 1 / -1; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: auto; }
+.history-head { flex-wrap: wrap; row-gap: 2px; }
+.history-compare .compare-note { margin: 8px 12px; }
+.compare-table { margin: 0 12px 8px; width: calc(100% - 24px); table-layout: fixed; }
+.compare-table th { text-align: left; font-weight: 600; font-size: 12px; color: var(--mute); padding: 4px 8px; }
+.compare-table td:first-child { width: 110px; color: var(--mute); }
+.compare-table td { word-break: break-all; }
+.compare-table tr.compare-changed td { background: var(--accent-soft); }
+.compare-changes { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 12px; }
+.compare-chip { padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); font-family: var(--mono); }
+.compare-chip.added { border-color: var(--ok); color: var(--ok); }
+.compare-chip.removed { border-color: var(--bad); color: var(--bad); }
+.compare-chip.changed { border-color: var(--warn); color: var(--warn); }
+.compare-diff { min-height: 220px; }

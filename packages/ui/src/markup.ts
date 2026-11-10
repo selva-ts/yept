@@ -39,3 +39,22 @@ export function previewDocument(html: string): string {
   const doctype = /^﻿?\s*<!doctype[^>]*>/i.exec(html);
   return doctype ? doctype[0] + meta + html.slice(doctype[0].length) : meta + html;
 }
+
+/**
+ * Images (a picture response, or the pages of a PDF drawn as images) as a document for the same sandboxed frame, under
+ * PREVIEW_CSP. Only data: URLs made from the received bytes appear in it; it has no scripts and loads nothing.
+ */
+export function mediaDocument(images: { src: string; alt: string }[]): string {
+  const safe = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const body = images
+    .filter((i) => /^data:(image\/[\w.+-]+);base64,[A-Za-z0-9+/=]*$/.test(i.src))
+    .map((i) => `<img src="${i.src}" alt="${safe(i.alt)}">`)
+    .join('');
+  return (
+    `<!doctype html><meta http-equiv="Content-Security-Policy" content="${PREVIEW_CSP}">` +
+    '<style>html{background:#e9e9e9}body{margin:0;padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px}' +
+    'img{max-width:100%;height:auto;box-shadow:0 1px 4px rgba(0,0,0,.25);' +
+    'background:#fff conic-gradient(#ddd 25%,#fff 0 50%,#ddd 0 75%,#fff 0) 0 0/16px 16px}</style>' +
+    body
+  );
+}

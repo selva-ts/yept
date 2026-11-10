@@ -20,6 +20,16 @@ export interface CodeEditorProps {
   /** Colour {{variables}} by resolution state (request bodies). */
   highlightVars?: boolean;
   onChange?: (value: string) => void;
+  /** The selected text, each time the selection changes ('' when nothing is selected). */
+  onSelectionText?: (text: string) => void;
+  /** Adds "Set as variable…" to the editor's context menu, called with the selected text. */
+  onSetAsVariable?: (text: string) => void;
+}
+
+export interface DiffViewerProps {
+  original: string;
+  modified: string;
+  language: 'json' | 'plaintext';
 }
 
 /** Monaco theme and font for the current appearance; follows a live light/dark switch. */
@@ -44,6 +54,17 @@ const MonacoCodeEditor = lazy(loadMonacoEditor);
 /** Starts loading the editor before one is shown, so the first editor appears without waiting. */
 export function preloadCodeEditor(): void {
   void loadMonacoEditor();
+}
+
+const MonacoDiffViewer = lazy(() => import('./MonacoCodeEditor').then((m) => ({ default: m.MonacoDiffViewer })));
+
+/** Two texts side by side with their differences marked, read-only. */
+export function DiffViewer(props: DiffViewerProps): React.JSX.Element {
+  return (
+    <Suspense fallback={null}>
+      <MonacoDiffViewer {...props} />
+    </Suspense>
+  );
 }
 
 export function CodeEditor(props: CodeEditorProps): React.JSX.Element {
