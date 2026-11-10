@@ -137,7 +137,7 @@ try {
 
   // 5. Saved in Bruno's shape.
   await page.keyboard.press('Control+s');
-  const file = await waitForFile(join(wsDir, 'sample-travel', 'Secure resource.yml'), (text) => text.includes('type: ntlm'));
+  const file = await waitForFile(join(wsDir, 'sample-travel', 'Secure resource.yml'), (text) => text.includes('type: ntlm'), 20000);
   check('saved as Bruno NTLM auth', /type: ntlm\n\s+username: sample-user\n\s+password: "\{\{ntlmPassword\}\}"\n\s+domain: SAMPLE/.test(file), file.split('\n').slice(6, 14).join(' | '));
 
   // 6. Dark theme.

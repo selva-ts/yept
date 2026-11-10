@@ -701,7 +701,12 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
   // AWS: signed last, over the request exactly as it will go out (cookies included, the body hashed).
   if (auth.mode === 'awsv4' && !ownAuthorization && !opts.prepared) {
     const w = auth.awsv4;
-    const bodyHash = encoded ? await hashStream(encoded.stream()) : sha256Hex(prepared.data ?? '');
+    let bodyHash: string;
+    try {
+      bodyHash = encoded ? await hashStream(encoded.stream()) : sha256Hex(prepared.data ?? '');
+    } catch (e) {
+      return notSent({ outcome: 'prepare_error', message: `Couldn't read the body to sign it: ${(e as Error).message}` });
+    }
     const creds = { accessKeyId: I(w.accessKeyId).trim(), secretAccessKey: I(w.secretAccessKey).trim(), sessionToken: I(w.sessionToken).trim() || undefined, service: I(w.service).trim(), region: I(w.region).trim() };
     Object.assign(prepared.headers, signRequest({ method: prepared.method, url: prepared.url, headers: prepared.headers, bodyHash }, creds));
     timeline.push({ atMs: at(), label: 'AWS Signature v4', detail: `Signed for ${creds.service} in ${creds.region}` });
