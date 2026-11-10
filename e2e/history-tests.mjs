@@ -31,11 +31,10 @@ const check = (name, ok, detail = '') => {
 let app;
 let page;
 const launch = async () => {
-  app = await electron.launch({ args: [root], env: { ...process.env, YEPT_USER_DATA: userData } });
+  app = await electron.launch({ args: [root], env: { ...process.env, YEPT_USER_DATA: userData }, timeout: 60000 });
   page = await app.firstWindow();
   page.on('pageerror', (e) => check('no renderer errors', false, e.message));
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.getByText('Sample Travel').waitFor({ timeout: 15000 });
   await page.getByRole('button', { name: 'Open Sample Travel' }).click();
 };
 const quit = async () => {
@@ -49,10 +48,12 @@ const openByPalette = async (query, title) => {
   await page.keyboard.press('Enter');
   await page.locator('.doc-title', { hasText: title }).waitFor();
 };
-const send = async () => {
+const historyButton = (count) => page.getByRole('button', { name: `History · ${count}`, exact: true });
+const send = async (count) => {
   await page.keyboard.press('Control+Enter');
+  // An old response can stay visible while the next request runs.
+  await historyButton(count).waitFor();
   await page.locator('.statusbar .status').waitFor();
-  await page.waitForFunction(() => !document.querySelector('.statusbar .spinner'), null, { timeout: 20000 });
 };
 const status = () => page.locator('.statusbar .status').innerText();
 const sub = (name) => page.locator('.editor-section .subtab', { hasText: name }).first();
@@ -77,12 +78,12 @@ try {
   await dlg.getByLabel('Secret value for clientSecret').fill(CLIENT_SECRET);
   await dlg.getByLabel('Secret value for clientSecret').press('Enter');
   await dlg.getByRole('button', { name: 'Use this environment' }).click();
-  await page.waitForTimeout(300);
+  await dlg.getByRole('button', { name: 'Use this environment' }).waitFor({ state: 'detached' });
   await dlg.getByRole('button', { name: 'Close' }).click();
 
   // 1. Login has 2 tests + 1 assertion in the fixture file.
   await openByPalette('travel login', 'Login');
-  await send();
+  await send(1);
   check('login 200', (await status()).startsWith('200'));
   check('tests badge shows 3/3 passed', await page.getByText('Tests 3/3 passed').isVisible());
   // The code editor fills in just after the status bar settles.
@@ -101,7 +102,7 @@ try {
   await page.keyboard.press('Tab');
   await page.keyboard.insertText('eq 201');
   await setTests('test("has items", () => expect(res.body.items).to.have.length(2));\ntest("jest style", () => expect(res.status).toBe(200));');
-  await send();
+  await send(1);
   await respTab('Tests').click();
   const rows = await page.locator('.tests-table tr').allInnerTexts();
   check('failed assertion shown as failed', rows.some((r) => r.includes('failed') && r.includes('res.status eq 201')), rows.join(' | '));
@@ -112,7 +113,7 @@ try {
 
   // 3. Runaway test script is stopped (5 s limit) and shown as an error.
   await setTests('test("spin", () => { while (true) {} });');
-  await send();
+  await send(2);
   await respTab('Tests').click();
   check('runaway test stopped and shown as error', (await page.locator('.tests-table').innerText()).includes('timed out after 5000 ms'));
 
@@ -150,20 +151,20 @@ try {
   await quit();
   await launch();
   await openByPalette('all bookings', 'All bookings');
-  await page.getByRole('button', { name: /^History · 2/ }).waitFor({ timeout: 5000 }).catch(() => {});
+  await historyButton(2).waitFor();
   check('history survives a restart and follows the rename', (await page.getByRole('button', { name: /^History/ }).innerText()).includes('2'));
   await page.getByRole('button', { name: /^History/ }).click();
   await page.locator('.history-item').first().click();
   await respTab('Tests').click();
   check('restored history keeps the test results', (await page.locator('.tests-table').innerText()).includes('timed out'));
   // One more run so the 'keep 2' limit below has something to trim.
-  await send();
+  await send(3);
 
   // 8. Orphaned history: change and rename the Login file outside Yept so it can't be matched.
   const loginFile = join(wsDir, 'sample-travel', 'Auth', 'Login.yml');
   await fs.writeFile(join(wsDir, 'sample-travel', 'Auth', 'Sign in.yml'), readFileSync(loginFile, 'utf8').replace('/auth/token', '/auth/token?v=2').replace('name: Login', 'name: Sign in'));
   await fs.rm(loginFile);
-  await page.locator('.tree-row', { hasText: 'Sign in' }).waitFor({ timeout: 8000 });
+  await page.locator('.tree-row', { hasText: 'Sign in' }).waitFor();
   await openByPalette('sign in', 'Sign in');
   await page.locator('.app-statusbar').getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'History of deleted or moved requests…' }).click();
@@ -179,9 +180,9 @@ try {
   await page.locator('.app-statusbar').getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Runs kept per request').fill('2');
   await page.getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: 'Save' }).click();
+  await page.getByText('Settings saved', { exact: true }).waitFor();
   await page.getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: 'Close' }).click();
   await openByPalette('all bookings', 'All bookings');
-  await page.waitForTimeout(300);
   const counts = await page.evaluate(async () => {
     const snap = await window.yept.workspace.restore();
     const find = (nodes, name) => { for (const n of nodes) { if (n.name === name && n.kind === 'request') return n; const c = n.children && find(n.children, name); if (c) return c; } };
@@ -199,7 +200,8 @@ try {
   await quit();
   server.closeAllConnections();
   server.close();
-  await fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  // A file still held open by the closing app must not fail a run whose checks passed.
+  await fs.rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch((e) => console.log(`warning: temp folder not removed: ${e.message}`));
 }
 
 const failed = results.filter((r) => !r.ok);

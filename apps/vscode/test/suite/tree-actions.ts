@@ -43,7 +43,7 @@ export async function run(): Promise<void> {
   const workspace = api.collections.workspace(root) as any;
   const originalTrash = workspace.options.trash;
   const trashed: string[] = [];
-  workspace.options.trash = async (path: string) => { trashed.push(path); await rm(path, { recursive: true }); };
+  workspace.options.trash = async (path: string) => { trashed.push(path); await rm(path, { recursive: true, maxRetries: 5, retryDelay: 200 }); };
   const errors: string[] = [];
   win.showErrorMessage = async (message: string) => { errors.push(message); };
   const checks: [string, () => Promise<void>][] = [
@@ -54,6 +54,7 @@ export async function run(): Promise<void> {
       assert.ok(folder);
       win.showInputBox = async () => 'Renamed folder';
       await vscode.commands.executeCommand('yept.rename', folder);
+      assert.deepEqual(errors, []);
       const renamed = named('Renamed folder', 'folder');
       assert.ok(renamed);
       assert.equal(api.collections.getParent(renamed)?.id, writable.id);

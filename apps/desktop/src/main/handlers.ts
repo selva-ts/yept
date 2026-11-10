@@ -29,7 +29,7 @@ export function createHandlers(host: AppHost): { handlers: HandlerRegistry; clos
   const gitService = new GitService(ws, env, (path) => host.trash(path), () => workspaces.refreshAfterGit(), (fn) => workspaces.duringGit(fn));
   const importer = new ImportService(ws, env, host);
   const mutate = async (fn: () => Promise<string | void>): Promise<MutationResult> => {
-    const id = await fn();
+    const id = await workspaces.exclusive(fn);
     return { snapshot: ws().snapshot(), id: id ?? undefined };
   };
 

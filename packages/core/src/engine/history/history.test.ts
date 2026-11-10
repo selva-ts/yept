@@ -17,7 +17,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   store.close();
-  rmSync(dir, { recursive: true, force: true });
+  rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });
 
 // Assembled at runtime so secret scanners don't flag this synthetic value.

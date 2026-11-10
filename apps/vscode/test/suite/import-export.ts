@@ -86,6 +86,7 @@ export async function run(): Promise<void> {
     modals.length = 0;
     notices.length = 0;
     await vscode.commands.executeCommand('yept.importCollection');
+    await api.collections.settled();
   };
 
   const checks: [string, () => Promise<void>][] = [
@@ -105,6 +106,7 @@ export async function run(): Promise<void> {
         assert.match(preview.detail ?? '', summary);
         assert.match(preview.detail ?? '', /Nothing is sent or run during an import/);
         assert.deepEqual(preview.items, ['Import', 'Rename…']);
+        await until(() => snapshot().collections.some((c) => !before.has(c.name)), `imported collection from ${basename(path)}`);
         const added = snapshot().collections.filter((c) => !before.has(c.name));
         assert.equal(added.length, 1, path);
         if (expected) assert.equal(added[0].name, expected);
@@ -145,10 +147,12 @@ export async function run(): Promise<void> {
 
       await importFrom(file, { 'Import "': 'Import', 'A folder named': 'Replace Existing Files' });
       assert.ok(!(await readFile(login, 'utf8')).includes('Edited login'));
+      await until(() => requests('Sample Postman Travel').some((r) => r.name === 'Login'), 'restored Login request');
       assert.ok(requests('Sample Postman Travel').some((r) => r.name === 'Login'));
 
       await importFrom(file, { 'Import "': 'Import', 'A folder named': 'Import as a Copy' });
       assert.ok(existsSync(join(root, 'Sample Postman Travel (2)', 'opencollection.yml')));
+      await until(() => snapshot().collections.filter((c) => c.name === 'Sample Postman Travel').length === 2, 'both imported copies');
       assert.equal(snapshot().collections.filter((c) => c.name === 'Sample Postman Travel').length, 2);
       assert.deepEqual(errors, []);
     }],
@@ -174,6 +178,7 @@ export async function run(): Promise<void> {
       assert.deepEqual(errors, []);
       assert.match(modals[0].detail ?? '', /^OpenCollection \(bundled\) · 3 requests, 2 folders, 1 environment\./);
       assert.equal(modals.length, 2); // no conflict after the rename
+      await until(() => !!collection('Round trip'), 'round-trip collection');
       assert.deepEqual(requests('Round trip'), requests('Sample Bruno Travel'));
       const original = snapshot().collections.find((c) => c.name === 'Sample Bruno Travel')!;
       const copy = snapshot().collections.find((c) => c.name === 'Round trip')!;

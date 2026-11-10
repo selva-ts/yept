@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { waitForFile } from './wait.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const tmp = await fs.mkdtemp(join(tmpdir(), 'yept-sync-'));
@@ -14,7 +15,8 @@ const remote = join(tmp, 'remote.git');
 const other = join(tmp, 'other');
 const userData = join(tmp, 'user-data');
 const out = join(root, 'e2e/out');
-const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }).trim();
+const env = { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: join(tmp, 'gitconfig') };
+const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', env }).trim();
 const configure = (cwd) => {
   git(cwd, 'config', 'user.email', 'test@example.test'); git(cwd, 'config', 'user.name', 'Yept E2E');
   git(cwd, 'config', 'commit.gpgsign', 'false'); git(cwd, 'config', 'core.autocrlf', 'false');
@@ -23,7 +25,7 @@ await fs.mkdir(workspace, { recursive: true }); await fs.mkdir(out, { recursive:
 git(tmp, 'init', '--bare', '-b', 'main', remote); git(workspace, 'clone', remote, repo); configure(repo);
 await fs.cp(join(root, 'fixtures/collections/sample-travel'), join(repo, 'collection'), { recursive: true });
 await fs.writeFile(join(repo, 'README.md'), 'team\n'); git(repo, 'add', '.'); git(repo, 'commit', '-m', 'initial'); git(repo, 'push', '-u', 'origin', 'main');
-git(repo, 'branch', 'feature/local'); git(tmp, 'clone', remote, other); configure(other);
+git(repo, 'branch', 'feature/local'); git(tmp, 'clone', '--no-hardlinks', remote, other); configure(other);
 // A second repository proves the picker never carries selection/diffs across repositories.
 const second = join(workspace, 'second'); await fs.mkdir(second);
 git(second, 'init', '-b', 'main'); configure(second);
@@ -34,7 +36,7 @@ const secondLabel = await fs.realpath(second);
 await fs.mkdir(userData); await fs.writeFile(join(userData, 'preferences.json'), JSON.stringify({ lastWorkspace: workspace }));
 const checks = [];
 const check = (name, ok) => { checks.push(!!ok); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`); };
-const app = await electron.launch({ args: [root], env: { ...process.env, YEPT_USER_DATA: userData } });
+const app = await electron.launch({ args: [root], env: { ...env, YEPT_USER_DATA: userData }, timeout: 60000 });
 const page = await app.firstWindow(); await page.setViewportSize({ width: 1440, height: 1000 });
 page.on('pageerror', (e) => { console.error(e); check('no renderer error', false); });
 const panel = page.getByRole('complementary', { name: 'Git', exact: true });
@@ -43,8 +45,8 @@ const refresh = async () => {
   await panel.getByRole('button', { name: 'Refresh', exact: true }).waitFor();
 };
 const waitLog = async (text) => {
-  await panel.locator('.git-log', { hasText: text }).waitFor({ timeout: 20000 });
-  await page.waitForFunction(() => document.querySelector('aside[aria-label="Git"]')?.getAttribute('aria-busy') === 'false');
+  await panel.locator('.git-log > div').first().filter({ hasText: text }).waitFor({ timeout: 60000 });
+  await panel.and(page.locator('[aria-busy="false"]')).waitFor();
 };
 const request = join(repo, 'collection/Bookings/List bookings.yml');
 const peerRequest = join(other, 'collection/Bookings/List bookings.yml');
@@ -52,8 +54,17 @@ const selectFiles = async (name) => {
   await panel.locator('.git-file.all input').uncheck();
   await panel.locator('.git-file', { hasText: name }).getByRole('checkbox').check();
 };
+const saveAndSelectRequest = async (query) => {
+  await page.getByLabel('URL', { exact: true }).fill(`{{baseUrl}}/bookings?${query}`);
+  await page.locator('.tab.active .dirty-dot').waitFor();
+  await page.keyboard.press('Control+s');
+  await page.locator('.tab.active .dirty-dot').waitFor({ state: 'detached' });
+  const saved = await waitForFile(request, (text) => text.includes(query));
+  if (!saved.includes(query)) throw new Error(`Git fixture request was not saved with ${query}`);
+  await refresh();
+  await selectFiles('List bookings.yml');
+};
 try {
-  await page.getByRole('button', { name: 'Open Sample Travel' }).waitFor({ timeout: 15000 });
   await page.getByRole('button', { name: 'Open Sample Travel' }).click();
   await page.keyboard.press('Control+k'); await page.getByPlaceholder(/Go to request/).fill('list bookings'); await page.keyboard.press('Enter');
   await page.getByLabel('URL', { exact: true }).waitFor();
@@ -81,10 +92,10 @@ try {
   git(other, 'commit', '-am', 'remote two'); git(other, 'push');
   await panel.getByRole('button', { name: 'Pull', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('input[aria-label="URL"]')?.value.includes('remote=two'));
+  await waitLog('Pulled (fast-forward only)');
   check('pull silently reloads clean request tabs', true);
 
-  await page.getByLabel('URL', { exact: true }).fill('{{baseUrl}}/bookings?local=three'); await page.keyboard.press('Control+s');
-  await panel.locator('.git-file', { hasText: 'List bookings.yml' }).waitFor(); await refresh(); await selectFiles('List bookings.yml');
+  await saveAndSelectRequest('local=three');
   await panel.getByRole('button', { name: 'Stage selected', exact: true }).click(); await waitLog('Staged selected files');
   check('stage writes only the selected file to the index', git(repo, 'diff', '--cached', '--name-only') === 'collection/Bookings/List bookings.yml');
   await panel.getByRole('button', { name: 'Unstage selected', exact: true }).click(); await waitLog('Unstaged selected files');
@@ -104,8 +115,7 @@ try {
   await panel.getByLabel('Branch', { exact: true }).selectOption('main'); await waitLog('Switched to main');
   await page.waitForFunction(() => document.querySelector('input[aria-label="URL"]')?.value.includes('remote=two'));
 
-  await page.getByLabel('URL', { exact: true }).fill('{{baseUrl}}/bookings?sync=yes'); await page.keyboard.press('Control+s');
-  await panel.locator('.git-file', { hasText: 'List bookings.yml' }).waitFor(); await refresh(); await selectFiles('List bookings.yml');
+  await saveAndSelectRequest('sync=yes');
   await panel.getByLabel('Commit message').fill('sync from panel'); await panel.getByRole('button', { name: /^Commit 1 file/ }).click(); await waitLog('Committed 1 file');
   await panel.getByRole('button', { name: /^Sync / }).click(); await waitLog('Sync complete');
   check('Sync pushes local commits after pull', git(remote, 'log', '-1', '--format=%s', 'main') === 'sync from panel');
@@ -135,7 +145,8 @@ try {
   console.error(e); check('scenario completed', false); await page.screenshot({ path: join(out, 'git-sync-failure.png') }).catch(() => {});
 } finally {
   await app.evaluate(({ app }) => app.exit(0)).catch(() => {}); await app.close().catch(() => {});
-  await fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  // A file still held open by the closing app must not fail a run whose checks passed.
+  await fs.rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch((e) => console.log(`warning: temp folder not removed: ${e.message}`));
 }
 console.log(`${checks.filter(Boolean).length}/${checks.length} checks passed`);
 process.exit(checks.every(Boolean) ? 0 : 1);

@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { GIT_TIMED_OUT, Git, canonical, explainGitError, gitTimeoutMs } from './git';
@@ -23,24 +23,41 @@ const configure = (cwd: string): void => {
   sh(cwd, 'config', 'core.autocrlf', 'false');
 };
 
-beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'yept-git-'));
-  remote = join(dir, 'remote.git');
-  repo = join(dir, 'repo');
-  sh(dir, 'init', '--bare', '-b', 'main', remote);
-  sh(dir, 'clone', remote, repo);
-  configure(repo);
-  write('api/col/opencollection.yml', 'opencollection: 1.0.0\n');
-  write('api/col/A.yml', 'a: 1\n');
-  write('api/col/B.yml', 'b: 1\n');
-  write('README.md', 'readme\n');
-  sh(repo, 'add', '.');
-  sh(repo, 'commit', '-m', 'init');
-  sh(repo, 'push', '-u', 'origin', 'main');
-});
-afterEach(() => rmSync(dir, { recursive: true, force: true }));
+describe('Git', { timeout: 60000 }, () => {
+  let seed: string;
 
-describe('Git', () => {
+  beforeAll(() => {
+    seed = mkdtempSync(join(tmpdir(), 'yept-git-seed-'));
+    vi.stubEnv('GIT_CONFIG_NOSYSTEM', '1');
+    vi.stubEnv('GIT_CONFIG_GLOBAL', join(seed, 'gitconfig'));
+    repo = join(seed, 'repo');
+    sh(seed, 'init', '--bare', '-b', 'main', 'remote.git');
+    sh(seed, 'init', '-b', 'main', 'repo');
+    configure(repo);
+    write('api/col/opencollection.yml', 'opencollection: 1.0.0\n');
+    write('api/col/A.yml', 'a: 1\n');
+    write('api/col/B.yml', 'b: 1\n');
+    write('README.md', 'readme\n');
+    sh(repo, 'add', '.');
+    sh(repo, 'commit', '-m', 'init');
+    sh(repo, 'remote', 'add', 'origin', '../remote.git');
+    sh(repo, 'push', '-u', 'origin', 'main');
+  }, 60000);
+
+  // Every test gets its own working copy and bare remote without rewriting the same loose objects on every setup.
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'yept-git-'));
+    remote = join(dir, 'remote.git');
+    repo = join(dir, 'repo');
+    cpSync(join(seed, 'repo'), repo, { recursive: true });
+    cpSync(join(seed, 'remote.git'), remote, { recursive: true });
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+  afterAll(() => {
+    vi.unstubAllEnvs();
+    if (seed) rmSync(seed, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  });
+
   it('finds the repo, branch, upstream and ahead/behind', async () => {
     const root = await git.repoRoot(join(repo, 'api', 'col'));
     expect(root?.toLowerCase()).toBe(canonical(repo).toLowerCase());
@@ -107,7 +124,7 @@ describe('Git', () => {
 
     // Someone else pushes first.
     const other = join(dir, 'other');
-    sh(dir, 'clone', remote, other);
+    sh(dir, 'clone', '--no-hardlinks', remote, other);
     configure(other);
     writeFileSync(join(other, 'README.md'), 'theirs\n');
     sh(other, 'commit', '-am', 'theirs');
@@ -134,7 +151,7 @@ describe('Git', () => {
 
   it('fetches counts, pulls fast-forward and syncs local commits to the upstream', async () => {
     const other = join(dir, 'other');
-    sh(dir, 'clone', remote, other);
+    sh(dir, 'clone', '--no-hardlinks', remote, other);
     configure(other);
     writeFileSync(join(other, 'api/col/A.yml'), 'a: remote\n');
     sh(other, 'commit', '-am', 'remote update'); sh(other, 'push');
@@ -152,7 +169,7 @@ describe('Git', () => {
   });
 
   it('stops Sync on divergence without merging, rebasing, stashing or pushing', async () => {
-    const other = join(dir, 'other'); sh(dir, 'clone', remote, other); configure(other);
+    const other = join(dir, 'other'); sh(dir, 'clone', '--no-hardlinks', remote, other); configure(other);
     writeFileSync(join(other, 'README.md'), 'remote\n'); sh(other, 'commit', '-am', 'remote'); sh(other, 'push');
     write('api/col/A.yml', 'local\n'); sh(repo, 'commit', '-am', 'local');
     sh(repo, 'config', 'pull.rebase', 'true'); sh(repo, 'config', 'pull.autostash', 'true');
@@ -166,7 +183,7 @@ describe('Git', () => {
   });
 
   it('does not overwrite dirty files during a pull or auto-stash them', async () => {
-    const other = join(dir, 'other'); sh(dir, 'clone', remote, other); configure(other);
+    const other = join(dir, 'other'); sh(dir, 'clone', '--no-hardlinks', remote, other); configure(other);
     writeFileSync(join(other, 'api/col/A.yml'), 'remote\n'); sh(other, 'commit', '-am', 'remote'); sh(other, 'push');
     write('api/col/A.yml', 'unsaved on disk\n'); sh(repo, 'config', 'pull.autostash', 'true');
     const r = await git.pull(repo);
