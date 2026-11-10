@@ -149,6 +149,9 @@ export function ResponsePane({ tab, onOpenInEditor }: { tab: Tab; onOpenInEditor
   const partial = !!r?.body.preview;
   const large = !!r && (partial || (r.body.text.length > LARGE_BODY_CHARS && !forceLarge));
   const [filter, setFilter] = useState('');
+  // The filter bar opens from the Filter button and stays while a filter is set, so it takes no room otherwise.
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterable = mode === 'pretty' && shown?.data !== undefined;
   const deferredFilter = useDeferredValue(filter);
   const data = shown?.data;
   const filtered = useMemo(() => (data !== undefined && deferredFilter.trim() ? queryJsonPath(data, deferredFilter) : null), [data, deferredFilter]);
@@ -251,6 +254,11 @@ export function ResponsePane({ tab, onOpenInEditor }: { tab: Tab; onOpenInEditor
         ))}
         {view === 'body' && !r.body.binary && (
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }}>
+            {filterable && (
+              <button className={`btn ghost small ${filterOpen || filter ? 'active-toggle' : ''}`} aria-pressed={filterOpen || !!filter} onClick={() => { if (filterOpen || filter) { setFilter(''); setFilterOpen(false); } else setFilterOpen(true); }} title="Filter the JSON body with JSONPath">
+                Filter
+              </button>
+            )}
             {(kind === 'html' || media ? (['pretty', 'raw', 'preview'] as const) : (['pretty', 'raw'] as const)).map((m) => (
               <button key={m} className="btn ghost small" aria-pressed={mode === m} onClick={() => (previewFirst ? setMediaMode({ runId: r.runId, mode: m }) : setBodyMode(m))} style={mode === m ? { background: 'var(--sel)' } : undefined}>
                 {m[0].toUpperCase() + m.slice(1)}
@@ -306,7 +314,9 @@ export function ResponsePane({ tab, onOpenInEditor }: { tab: Tab; onOpenInEditor
                 </div>
               )}
               {mode === 'pretty' && shown?.formatting && <div className="truncated-note">Formatting…</div>}
-              {mode === 'pretty' && shown?.data !== undefined && <JsonFilterBar filter={filter} onFilter={setFilter} result={filtered} onSetVariable={() => setAsVariable()} />}
+              {filterable && (filterOpen || !!filter) && (
+                <JsonFilterBar filter={filter} onFilter={setFilter} result={filtered} onSetVariable={() => setAsVariable()} onClose={() => { setFilter(''); setFilterOpen(false); }} />
+              )}
               {mode === 'preview' && !large ? (
                 <HtmlPreview html={r.body.text} />
               ) : (

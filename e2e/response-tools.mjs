@@ -81,6 +81,9 @@ try {
   const body = JSON.parse(await copied());
   const token = body.access_token;
   check('login returns a token', typeof token === 'string' && token.length > 10);
+  const filterButton = () => page.locator('.response .subtabs').getByRole('button', { name: 'Filter', exact: true });
+  check('the filter bar is closed until asked for', !(await filterBox().isVisible()));
+  await filterButton().click();
   await filterBox().fill('$.access_token');
   await filterStatus().filter({ hasText: '1 match' }).waitFor();
   check('a filter shows its matches', JSON.stringify(JSON.parse(await copied())) === JSON.stringify([token]));
@@ -93,7 +96,8 @@ try {
   check('an invalid expression leaves the body shown', JSON.stringify(JSON.parse(await copied())) === JSON.stringify(body));
   await filterBox().fill('$.token_type');
   await page.getByRole('button', { name: 'Clear filter' }).click();
-  check('clearing returns to the whole body', (await filterBox().inputValue()) === '' && (await filterStatus().innerText()) === '' && JSON.stringify(JSON.parse(await copied())) === JSON.stringify(body));
+  check('clearing returns to the whole body and closes the bar', !(await filterBox().isVisible()) && JSON.stringify(JSON.parse(await copied())) === JSON.stringify(body));
+  await filterButton().click();
   await page.screenshot({ path: join(out, 'response-tools-filter.png') });
 
   // 2. Set as variable: the filter's one match, as a runtime variable; then used by the next request.
@@ -117,6 +121,7 @@ try {
   // The same value as a local secret: declared in the environment file, the value only on this machine, masked.
   await openByPalette('auth login', 'Login');
   await page.locator('.response .monaco-editor .view-lines', { hasText: 'access_token' }).waitFor({ timeout: 10000 });
+  if (!(await filterBox().isVisible())) await filterButton().click();
   await filterBox().fill('$.access_token');
   await filterStatus().filter({ hasText: '1 match' }).waitFor();
   await page.getByRole('button', { name: 'Set as variable…' }).click();

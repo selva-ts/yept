@@ -52,9 +52,9 @@ An HTML response also has **Preview**, which shows the page as a browser would d
 
 ### Filter, save and preview a response
 
-Above a JSON body in **Pretty** there is a **Filter** box that takes JSONPath: `$.items[*].id`, `$..price`, `$.items[0]`, `$.items[-1]`, `$.items[1:3]`, `$['x-request-id']`, or a filter such as `$.items[?(@.price < 10 && @.status == 'open')]`. The leading `$` is optional. The body is replaced by the matching values while the filter is on, and **Copy** copies them. A mistake in the expression shows a message beside the box and leaves the body as it is. Clear the box, or press **Esc**, to return to the whole body. A filter that matches a huge number of values shows the first 10,000.
+For a JSON body in **Pretty**, click **Filter** beside Pretty and Raw. The box takes JSONPath: `$.items[*].id`, `$..price`, `$.items[0]`, `$.items[-1]`, `$.items[1:3]`, `$['x-request-id']`, or a filter such as `$.items[?(@.price < 10 && @.status == 'open')]`. The leading `$` is optional. The body is replaced by the matching values while the filter is on, and **Copy** copies them. A mistake in the expression shows a message beside the box and leaves the body as it is. Click **✕** or **Filter** again, or press **Esc**, to return to the whole body. A filter that matches a huge number of values shows the first 10,000.
 
-**Set as variable…** saves a value from the response into the collection's active environment. It takes the value you selected in the body (also on the editor's right-click menu), or else the one value the filter matches. Choose a name and where it goes:
+**Set as variable…** saves a value from the response into the collection's active environment. It is in the filter bar and on the body editor's right-click menu. It takes the value you selected in the body, or else the one value the filter matches. Choose a name and where it goes:
 
 - **Runtime variable**: kept for this session only, like a value a post-response variable extracts. Use it as `{{name}}` in the next requests.
 - **Local secret**: for tokens and keys. The environment file only declares the name as a secret; the value is encrypted on this machine and shown masked, as other secrets are. A name such as `token`, `secret` or `apiKey` picks this by default.

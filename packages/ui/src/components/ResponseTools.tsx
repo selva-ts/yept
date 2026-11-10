@@ -11,7 +11,8 @@ import { useStore } from '../store';
 import { DiffViewer } from './CodeEditor';
 
 /** The filter box above a JSON body in the Pretty view. */
-export function JsonFilterBar({ filter, onFilter, result, onSetVariable }: { filter: string; onFilter: (f: string) => void; result: JsonPathResult | null; onSetVariable: () => void }): React.JSX.Element {
+/** onClose clears the filter and hides the bar (✕ or Esc). */
+export function JsonFilterBar({ filter, onFilter, result, onSetVariable, onClose }: { filter: string; onFilter: (f: string) => void; result: JsonPathResult | null; onSetVariable: () => void; onClose: () => void }): React.JSX.Element {
   const count = result?.ok ? result.matches.length : 0;
   return (
     <div className="json-filter">
@@ -20,15 +21,14 @@ export function JsonFilterBar({ filter, onFilter, result, onSetVariable }: { fil
         aria-label="Filter with JSONPath"
         placeholder="Filter with JSONPath, e.g. $.items[*].id"
         spellCheck={false}
+        autoFocus
         value={filter}
         onChange={(e) => onFilter(e.target.value)}
-        onKeyDown={(e) => e.key === 'Escape' && onFilter('')}
+        onKeyDown={(e) => e.key === 'Escape' && onClose()}
       />
-      {filter && (
-        <button className="btn ghost small" aria-label="Clear filter" title="Clear filter (Esc)" onClick={() => onFilter('')}>
-          ✕
-        </button>
-      )}
+      <button className="btn ghost small" aria-label="Clear filter" title="Clear and close the filter (Esc)" onClick={onClose}>
+        ✕
+      </button>
       <span className={`json-filter-status small ${result && !result.ok ? 'bad-text' : 'mute'}`} role="status">
         {!result ? '' : !result.ok ? result.error : result.capped ? `First ${JSONPATH_MAX_MATCHES.toLocaleString()} matches` : `${count} ${count === 1 ? 'match' : 'matches'}`}
       </span>
