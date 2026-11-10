@@ -23,6 +23,8 @@ npm run package:mac
 | `Yept-0.9.0-mac-arm64.dmg` / `.zip` | Apple Silicon Macs |
 | `Yept-0.9.0-mac-x64.dmg` / `.zip` | Intel Macs |
 
+To build for one architecture, use `npm run package:mac-arch -- --arm64` for Apple Silicon or `npm run package:mac-arch -- --x64` for Intel.
+
 The log will say `skipped macOS application code signing` — expected for a local build.
 
 ## 3. Install and first launch
