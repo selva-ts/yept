@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { createFixtureServer, CLIENT_ID, CLIENT_SECRET } from '../../../../../fixtures/server/server.mjs';
-import { DEFAULT_OAUTH2, type AuthConfig, type RequestDoc, type RunResult } from '../../shared/model';
+import { emptyAuth, type AuthConfig, type RequestDoc, type RunResult } from '../../shared/model';
 import type { RunnerPlanItem } from '../../shared/collection-run';
 import { SandboxHost } from '../sandbox/host';
 import { emptyEnvLayer, type VarLayers } from '../env/variables';
@@ -215,7 +215,7 @@ describe('runSequence through the request pipeline', () => {
     await sandbox.close();
   });
 
-  const noAuth: AuthConfig = { mode: 'none', bearer: { token: '' }, basic: { username: '', password: '' }, apikey: { key: '', value: '', placement: 'header' }, oauth2: { ...DEFAULT_OAUTH2 } };
+  const noAuth: AuthConfig = { ...emptyAuth(), mode: 'none' };
   const bearer: AuthConfig = { ...noAuth, mode: 'bearer', bearer: { token: '{{accessToken}}' } };
   const doc = (over: Partial<RequestDoc>): RequestDoc => ({
     name: 't', method: 'GET', url: '', params: [], headers: [],

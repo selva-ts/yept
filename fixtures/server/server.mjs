@@ -3,6 +3,9 @@
 import http from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
+import { authSchemeRoute } from './auth-schemes.mjs';
+
+export { AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, DIGEST_PASSWORD, DIGEST_USER, NTLM_DOMAIN, NTLM_PASSWORD, NTLM_USER } from './auth-schemes.mjs';
 
 export const CLIENT_ID = 'sample-client';
 export const CLIENT_SECRET = 'sample-secret';
@@ -124,6 +127,9 @@ export function createFixtureServer() {
       issuedTokens.clear();
       return send(res, 200, { revoked: true });
     }
+    // Digest (/auth/digest), NTLM (/auth/ntlm) and AWS Signature v4 (/auth/aws/...): see auth-schemes.mjs.
+    const scheme = authSchemeRoute(req, url, raw);
+    if (scheme) return send(res, scheme.status, scheme.body, scheme.headers);
     // Accepts the token as ?access_token= instead of a header.
     if (url.pathname === '/bookings-by-query' && req.method === 'GET') {
       if (!issuedTokens.has(url.searchParams.get('access_token') ?? '')) return send(res, 401, { error: 'unauthorized' });

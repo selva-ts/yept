@@ -12,7 +12,7 @@ The application is MIT licensed, needs no Yept account and has no telemetry. Col
 ## What it does
 
 - Edit requests with headers, query parameters, JSON, text, XML, URL-encoded forms and multipart file uploads.
-- Use environments and encrypted local secrets, bearer/basic/API-key auth, and OAuth2 client credentials with token caching.
+- Use environments and encrypted local secrets; bearer, basic, API key, Digest, NTLM and AWS Signature v4 auth; and OAuth2 client credentials with token caching.
 - Run pre/post-request scripts, assertions and a sequential collection runner, with CSV or JSON data files, repeat counts, a delay between requests, and JUnit or HTML reports. Unresolved variables block sending.
 - Inspect redirect hops, sent headers, timings, TLS details, cookies, reconstructed raw HTTP in Dev tools. Copy a request as cURL, C# `HttpClient`, PowerShell `Invoke-RestMethod`, JavaScript `fetch` or axios, or Python `requests`, with secrets masked unless you ask for them.
 - Keep response history with redaction before storage, and follow requests across renames. Compare two stored runs side by side.
@@ -110,6 +110,7 @@ The [desktop validation workflow](.github/workflows/ci.yml) checks pull requests
 - HTTP request workflows only: no dedicated WebSocket, gRPC or MQTT client, CLI runner or cloud collaboration service.
 - OAuth2 client credentials only; no authorization-code/PKCE, password/implicit flows or refresh-token flow.
 - Collection runs are sequential, at most 1,000 iterations, with no schedules or parallel runs. Data files are CSV or JSON up to 5 MB.
+- No Kerberos/Negotiate or proxy auth. AWS Signature v4 needs the access keys in the request: AWS profiles are not read.
 - Bruno compatibility is limited to the supported file fields and script APIs. `.bru` collections open read-only and can be converted to YAML. Unsupported body types are retained when editing other fields but cannot be sent until changed to a supported type. `bru.runRequest` and multipart file sends through `bru.sendRequest` are unavailable.
 - Scripts have a five-second execution limit. `bru.sendRequest` shares that limit and permits at most ten requests per script.
 - The Git panel does not resolve merges, rebase, stash or force-push. Use your normal Git tool for those operations.

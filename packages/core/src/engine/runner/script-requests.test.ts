@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { postmanTranslation } from '@usebruno/converters';
 import { createFixtureServer, CLIENT_ID, CLIENT_SECRET } from '../../../../../fixtures/server/server.mjs';
-import { DEFAULT_OAUTH2, type AuthConfig, type RequestDoc, type SettingsDoc } from '../../shared/model';
+import { emptyAuth, type AuthConfig, type RequestDoc, type SettingsDoc } from '../../shared/model';
 import { SandboxHost } from '../sandbox/host';
 import { emptyEnvLayer, type VarLayers } from '../env/variables';
 import { CookieStore } from '../cookies/cookie-store';
@@ -38,7 +38,7 @@ afterAll(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-const noAuth: AuthConfig = { mode: 'none', bearer: { token: '' }, basic: { username: '', password: '' }, apikey: { key: '', value: '', placement: 'header' }, oauth2: { ...DEFAULT_OAUTH2 } };
+const noAuth: AuthConfig = { ...emptyAuth(), mode: 'none' };
 const doc = (over: Partial<RequestDoc> = {}): RequestDoc => ({
   name: 't', method: 'GET', url: '{{baseUrl}}/echo', params: [], headers: [],
   body: { mode: 'none', json: '', text: '', xml: '', formUrlEncoded: [], multipartForm: [] },

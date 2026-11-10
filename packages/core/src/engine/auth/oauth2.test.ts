@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { createFixtureServer, CLIENT_ID, CLIENT_SECRET } from '../../../../../fixtures/server/server.mjs';
-import { DEFAULT_OAUTH2, type AuthConfig, type OAuth2Config, type RequestDoc } from '../../shared/model';
+import { DEFAULT_OAUTH2, emptyAuth, type AuthConfig, type OAuth2Config, type RequestDoc } from '../../shared/model';
 import { emptyEnvLayer, type VarLayers } from '../env/variables';
 import { run, type RunOptions } from '../runner/runner';
 import { applyRequestDoc, parseRequestFile, stringifyRequestFile, toRequestDoc } from '../workspace/bruno-adapter';
@@ -26,7 +26,8 @@ const tokenRequests = async (): Promise<number> => (await (await fetch(`${base}/
 const revokeAll = async (): Promise<void> => void (await fetch(`${base}/auth/revoke`, { method: 'POST' }));
 
 const oauth = (over: Partial<OAuth2Config> = {}): AuthConfig => ({
-  mode: 'oauth2', bearer: { token: '' }, basic: { username: '', password: '' }, apikey: { key: '', value: '', placement: 'header' },
+  ...emptyAuth(),
+  mode: 'oauth2',
   oauth2: { ...DEFAULT_OAUTH2, accessTokenUrl: '{{baseUrl}}/auth/token', clientId: '{{clientId}}', clientSecret: '{{clientSecret}}', ...over }
 });
 const doc = (over: Partial<RequestDoc> = {}): RequestDoc => ({

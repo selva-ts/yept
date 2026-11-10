@@ -9,7 +9,7 @@ import { stringifyRequest, stringifyFolder, stringifyEnvironment } from '@usebru
 import { utils as brunoUtils } from '@usebruno/common';
 import { stringifyCollectionFile } from '../workspace/bruno-adapter';
 import { atomicWrite } from '../fs/atomic-write';
-import { looksLikeSecret } from '../../shared/secrets';
+import { looksLikeSecret, type SecretField } from '../../shared/secrets';
 import { fileNameOf, isAbsolutePath } from '../../shared/multipart';
 
 export type ImportFormat = 'postman' | 'insomnia' | 'openapi' | 'opencollection';
@@ -34,7 +34,9 @@ export interface SecretFinding {
   id: string;
   /** Request or environment name, for display. */
   where: string;
-  field: 'bearer token' | 'basic password' | 'api key' | 'client secret' | 'authorization header' | 'environment value';
+  field:
+    | 'bearer token' | 'basic password' | 'api key' | 'client secret' | 'digest password' | 'ntlm password' | 'aws secret access key' | 'aws session token'
+    | 'authorization header' | 'environment value';
   /** Suggested {{variable}} name. */
   variable: string;
   /** Masked preview of the value. */
@@ -124,6 +126,7 @@ export async function convertSource(text: string, fileName: string): Promise<Imp
   model.items ??= [];
   model.environments ??= [];
   if (format === 'insomnia') restoreInsomniaFileFields(model.items, insomniaFileParams(data));
+  if (format === 'insomnia') restoreInsomniaAuth(model.items, insomniaAuth(data));
   issues.push(...fixUploadPaths(model.items));
   const removed = dedupe(model.items);
   if (removed) issues.push(`Removed ${removed} duplicate request${removed > 1 ? 's' : ''} created by the converter (identical copies of the same request).`);
@@ -173,6 +176,43 @@ function restoreInsomniaFileFields(items: any[], files: Map<string, Map<string, 
   });
 }
 
+// ---------- Insomnia auth the converter leaves out ----------
+
+/** Insomnia's {{ _.name }} is Bruno's {{name}}. */
+const insomniaVars = (v: unknown): string => String(v ?? '').replace(/\{\{\s*_\.([^{}\s]+)\s*\}\}/g, '{{$1}}');
+
+/** Digest, NTLM and AWS (Insomnia calls it "iam") auth by request name, in Bruno's shape. */
+function insomniaAuth(data: any): Map<string, { mode: string; value: Record<string, string> }> {
+  const out = new Map<string, { mode: string; value: Record<string, string> }>();
+  const visit = (node: any): void => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) return node.forEach(visit);
+    const a = node.authentication;
+    if (typeof node.name === 'string' && a && !a.disabled) {
+      if (a.type === 'digest') out.set(node.name, { mode: 'digest', value: { username: insomniaVars(a.username), password: insomniaVars(a.password) } });
+      if (a.type === 'ntlm') out.set(node.name, { mode: 'ntlm', value: { username: insomniaVars(a.username), password: insomniaVars(a.password), domain: insomniaVars(a.domain) } });
+      if (a.type === 'iam') {
+        out.set(node.name, {
+          mode: 'awsv4',
+          value: { accessKeyId: insomniaVars(a.accessKeyId), secretAccessKey: insomniaVars(a.secretAccessKey), sessionToken: insomniaVars(a.sessionToken), service: insomniaVars(a.service), region: insomniaVars(a.region), profileName: '' }
+        });
+      }
+    }
+    for (const v of Object.values(node)) if (v && typeof v === 'object') visit(v);
+  };
+  visit(data);
+  return out;
+}
+
+/** Bruno's Insomnia converter imports only basic and bearer auth; the others arrive as no auth. */
+function restoreInsomniaAuth(items: any[], auth: Map<string, { mode: string; value: Record<string, string> }>): void {
+  eachRequest(items, (it) => {
+    const a = auth.get(String(it.name));
+    if (!a || !it.request || !['none', 'inherit', undefined].includes(it.request.auth?.mode)) return;
+    it.request.auth = { ...it.request.auth, mode: a.mode, [a.mode]: a.value };
+  });
+}
+
 /**
  * Upload paths in imported requests point at files on the exporting computer. Absolute paths are left out of the
  * shared files (each user chooses the file again on their computer); relative ones are kept, now relative to the
@@ -199,6 +239,23 @@ export function fixUploadPaths(items: any[]): string[] {
 
 const SECRETISH_NAME = /pass(word)?|secret|token|api[-_]?key|private|credential/i;
 
+/** Credential fields in auth settings, in the order findings are numbered. */
+const AUTH_SECRETS: { mode: string; key: string; kind: SecretField; field: SecretFinding['field']; variable: string }[] = [
+  { mode: 'bearer', key: 'token', kind: 'token', field: 'bearer token', variable: 'accessToken' },
+  { mode: 'basic', key: 'password', kind: 'password', field: 'basic password', variable: 'password' },
+  { mode: 'apikey', key: 'value', kind: 'apikey', field: 'api key', variable: 'apiKey' },
+  { mode: 'oauth2', key: 'clientSecret', kind: 'password', field: 'client secret', variable: 'clientSecret' },
+  { mode: 'digest', key: 'password', kind: 'password', field: 'digest password', variable: 'digestPassword' },
+  { mode: 'ntlm', key: 'password', kind: 'password', field: 'ntlm password', variable: 'ntlmPassword' },
+  { mode: 'awsv4', key: 'secretAccessKey', kind: 'password', field: 'aws secret access key', variable: 'awsSecretAccessKey' },
+  { mode: 'awsv4', key: 'sessionToken', kind: 'token', field: 'aws session token', variable: 'awsSessionToken' }
+];
+/** The literal credential in this auth field, or undefined when it holds none (or a {{variable}}). */
+const authSecret = (a: any, s: (typeof AUTH_SECRETS)[number]): string | undefined => {
+  const v = String(a?.[s.mode]?.[s.key] ?? '');
+  return a?.mode === s.mode && looksLikeSecret(v, s.kind) ? v : undefined;
+};
+
 /** Literal credentials in the imported data. Each can be replaced with a {{variable}} declared secret (value not written). */
 export function findSecrets(model: CollectionModel): SecretFinding[] {
   const out: SecretFinding[] = [];
@@ -211,10 +268,10 @@ export function findSecrets(model: CollectionModel): SecretFinding[] {
       }
       const a = it.request?.auth;
       const name = String(it.name);
-      if (a?.mode === 'bearer' && looksLikeSecret(String(a.bearer?.token ?? ''), 'token')) out.push({ id: `s${n++}`, where: name, field: 'bearer token', variable: 'accessToken', preview: maskValue(String(a.bearer.token)) });
-      if (a?.mode === 'basic' && looksLikeSecret(String(a.basic?.password ?? ''), 'password')) out.push({ id: `s${n++}`, where: name, field: 'basic password', variable: 'password', preview: maskValue(String(a.basic.password)) });
-      if (a?.mode === 'apikey' && looksLikeSecret(String(a.apikey?.value ?? ''), 'apikey')) out.push({ id: `s${n++}`, where: name, field: 'api key', variable: 'apiKey', preview: maskValue(String(a.apikey.value)) });
-      if (a?.mode === 'oauth2' && looksLikeSecret(String(a.oauth2?.clientSecret ?? ''), 'password')) out.push({ id: `s${n++}`, where: name, field: 'client secret', variable: 'clientSecret', preview: maskValue(String(a.oauth2.clientSecret)) });
+      for (const s of AUTH_SECRETS) {
+        const v = authSecret(a, s);
+        if (v !== undefined) out.push({ id: `s${n++}`, where: name, field: s.field, variable: s.variable, preview: maskValue(v) });
+      }
       for (const h of it.request?.headers ?? []) {
         if (String(h.name).toLowerCase() === 'authorization' && looksLikeSecret(String(h.value ?? ''), 'header')) out.push({ id: `s${n++}`, where: name, field: 'authorization header', variable: 'accessToken', preview: maskValue(String(h.value)) });
       }
@@ -249,10 +306,10 @@ export function applySecretFixes(model: CollectionModel, fixIds: Set<string>): {
         values.push({ name: variable, value, environment: null });
         return `{{${variable}}}`;
       };
-      if (a?.mode === 'bearer' && looksLikeSecret(String(a.bearer?.token ?? ''), 'token') && fixIds.has(`s${n++}`)) a.bearer.token = take('accessToken', String(a.bearer.token));
-      if (a?.mode === 'basic' && looksLikeSecret(String(a.basic?.password ?? ''), 'password') && fixIds.has(`s${n++}`)) a.basic.password = take('password', String(a.basic.password));
-      if (a?.mode === 'apikey' && looksLikeSecret(String(a.apikey?.value ?? ''), 'apikey') && fixIds.has(`s${n++}`)) a.apikey.value = take('apiKey', String(a.apikey.value));
-      if (a?.mode === 'oauth2' && looksLikeSecret(String(a.oauth2?.clientSecret ?? ''), 'password') && fixIds.has(`s${n++}`)) a.oauth2.clientSecret = take('clientSecret', String(a.oauth2.clientSecret));
+      for (const s of AUTH_SECRETS) {
+        const v = authSecret(a, s);
+        if (v !== undefined && fixIds.has(`s${n++}`)) a[s.mode][s.key] = take(s.variable, v);
+      }
       for (const h of it.request?.headers ?? []) {
         if (String(h.name).toLowerCase() === 'authorization' && looksLikeSecret(String(h.value ?? ''), 'header') && fixIds.has(`s${n++}`)) {
           const m = /^(bearer|basic)\s+(.*)$/i.exec(String(h.value));

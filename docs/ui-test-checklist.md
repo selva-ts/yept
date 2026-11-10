@@ -141,6 +141,16 @@ For the installed build, run `dist\Yept-Setup-0.9.0.exe` instead of `npm run dev
 | Open the same collection in Bruno after saving | Bruno shows the OAuth2 client credentials settings unchanged | |
 | Wrong client secret; Get token | The token endpoint's error is shown; the secret appears nowhere in the response, timeline or Dev tools | |
 
+## H2. Digest, NTLM and AWS Signature v4
+
+| Check | Expected | Result |
+|---|---|---|
+| A test server with Digest auth (for example a local nginx or IIS with Digest), password stored as a local secret | 200; Network shows the 401 and the second send, `Authorization` masked | |
+| An IIS site with Windows authentication (NTLM only), from a Windows machine | 200 with the right user; a wrong password ends with 401 | |
+| An API Gateway or S3 test bucket in a sandbox account, keys as local secrets; a GET with a query, then a PUT with a JSON body | Both accepted; with temporary credentials, the session token works and is masked | |
+| Open the same collection in Bruno after saving each mode | Bruno shows the same settings, and the AWS profile name is unchanged | |
+| Import a Postman and an Insomnia export using these modes | The modes come across; literal passwords and secret keys are offered as local secrets | |
+
 ## I. Multipart / form-data uploads
 
 | Check | Expected | Result |

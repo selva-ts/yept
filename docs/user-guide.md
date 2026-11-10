@@ -34,6 +34,14 @@ The script gets `status`, `headers` and `data` (parsed JSON) back. A non-2xx sta
 
 For an API that uses OAuth2 client credentials, choose **OAuth2 client credentials** in the Auth tab instead (on the collection, to inherit it everywhere). Enter the token URL, `{{clientId}}` and a `{{clientSecret}}` stored as a local secret, and the scope if the API needs one. Yept gets a token on the first send, reuses it until it expires and then gets a new one. The Auth tab shows the token's state, with **Get token** and **Forget token**. Tokens are kept in memory for each environment, never in files. If the server rejects a cached token, a GET is re-sent once with a new token; a POST, PUT, PATCH or DELETE is not, so send it again.
 
+Three more modes in the Auth tab, for APIs that need them. Keep each password or secret key in a `{{variable}}` stored as a local secret; a literal one gets the **Store as local secret** hint, as for Basic.
+
+- **Digest**: username and password. Yept sends the request, the server answers 401 with a challenge, and Yept sends it once more with the answer. MD5, SHA-256 and SHA-512-256 (also `-sess`) with qop `auth`, or servers that send no qop. Network shows both sends.
+- **NTLM**: username, password and domain (or `DOMAIN\user` as the username). NTLMv2; the handshake runs on a connection of its own, so Network shows the 401 and the final answer. There is no workstation field, as in Bruno.
+- **AWS Signature v4**: access key ID, secret access key, an optional session token, service (for example `execute-api` or `s3`) and region. The request is signed just before it goes out, after variables are filled in, so the signature covers the final URL, headers and body. If a Bruno file names an AWS profile, the name is kept, but Yept doesn't read profiles: enter the keys.
+
+An `Authorization` header set on the request wins over all of these. Collections and folders can set them too, for requests that inherit.
+
 ### Upload files (multipart / form-data)
 
 In the Body tab, choose **Multipart**. Add **text fields** and **file fields**; each row has a name, a value or files, an optional content type, and a checkbox to leave it out. `{{variables}}` work in names, text values and file paths. **Choose files…** picks one or more files:

@@ -9,7 +9,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createFixtureServer, CLIENT_ID, CLIENT_SECRET } from '../../../../../fixtures/server/server.mjs';
-import { DEFAULT_OAUTH2, type AuthConfig, type RequestDoc, type SettingsDoc } from '../../shared/model';
+import { emptyAuth, type AuthConfig, type RequestDoc, type SettingsDoc } from '../../shared/model';
 import { SandboxHost } from '../sandbox/host';
 import { emptyEnvLayer, type VarLayers } from '../env/variables';
 import { run, type RunOptions } from './runner';
@@ -34,7 +34,7 @@ afterAll(async () => {
   await quick.close();
 });
 
-const noAuth: AuthConfig = { mode: 'none', bearer: { token: '' }, basic: { username: '', password: '' }, apikey: { key: '', value: '', placement: 'header' }, oauth2: { ...DEFAULT_OAUTH2 } };
+const noAuth: AuthConfig = { ...emptyAuth(), mode: 'none' };
 const doc = (over: Partial<RequestDoc> = {}): RequestDoc => ({
   name: 't', method: 'GET', url: '{{baseUrl}}/echo', params: [], headers: [],
   body: { mode: 'none', json: '', text: '', xml: '', formUrlEncoded: [], multipartForm: [] },
@@ -121,9 +121,9 @@ describe('login, token extraction and inherited auth', () => {
   });
 
   it('unsupported auth modes stop with a clear message', async () => {
-    const r = await run(doc({ auth: { ...noAuth, mode: 'digest' } }), opts({ layers: env() }));
+    const r = await run(doc({ auth: { ...noAuth, mode: 'wsse' } }), opts({ layers: env() }));
     expect(r.result.outcome).toBe('prepare_error');
-    expect(r.result.error?.message).toMatch(/digest.*isn't supported/);
+    expect(r.result.error?.message).toMatch(/wsse.*isn't supported/);
   });
 
   it('OAuth2 flows other than client credentials stop with a clear message', async () => {

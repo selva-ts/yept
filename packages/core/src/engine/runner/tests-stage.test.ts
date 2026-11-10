@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { createFixtureServer } from '../../../../../fixtures/server/server.mjs';
-import { DEFAULT_OAUTH2, type AuthConfig, type RequestDoc, type SettingsDoc } from '../../shared/model';
+import { emptyAuth, type AuthConfig, type RequestDoc, type SettingsDoc } from '../../shared/model';
 import { SandboxHost } from '../sandbox/host';
 import { run, type RunOptions } from './runner';
 
@@ -26,7 +26,7 @@ afterAll(async () => {
   await quick.close();
 });
 
-const noAuth: AuthConfig = { mode: 'none', bearer: { token: '' }, basic: { username: '', password: '' }, apikey: { key: '', value: '', placement: 'header' }, oauth2: { ...DEFAULT_OAUTH2 } };
+const noAuth: AuthConfig = { ...emptyAuth(), mode: 'none' };
 const doc = (over: Partial<RequestDoc> = {}): RequestDoc => ({
   name: 't', method: 'GET', url: `${base}/echo?x=1`, params: [], headers: [], body: { mode: 'none', json: '', text: '', xml: '', formUrlEncoded: [], multipartForm: [] },
   auth: noAuth, vars: { req: [], res: [] }, script: { req: '', res: '' }, tests: '', assertions: [], docs: '',

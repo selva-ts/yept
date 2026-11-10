@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CurlParseError, curlRequestName, parseCurl, requestFromCurl, toCurl, type CurlRequest, type ParsedCurl } from './curl';
-import type { RequestDoc } from './model';
+import { emptyAuth, type RequestDoc } from './model';
 
 describe('toCurl', () => {
   it('builds a GET with headers, leaving out the ones curl sets', () => {
@@ -298,7 +298,7 @@ describe('requestFromCurl', () => {
   const blank: RequestDoc = {
     name: 'New', method: 'GET', url: '', params: [], headers: [],
     body: { mode: 'none', json: '', text: '', xml: '', formUrlEncoded: [], multipartForm: [] },
-    auth: { mode: 'inherit', bearer: { token: '' }, basic: { username: '', password: '' }, apikey: { key: '', value: '', placement: 'header' }, oauth2: {} as RequestDoc['auth']['oauth2'] },
+    auth: { ...emptyAuth(), mode: 'inherit' },
     vars: { req: [], res: [] }, script: { req: '', res: '' }, tests: '', assertions: [], docs: '',
     settings: { encodeUrl: true, timeoutMs: 0, followRedirects: true, maxRedirects: 5, forwardAuthorizationHeader: false, sendCookies: true }
   };

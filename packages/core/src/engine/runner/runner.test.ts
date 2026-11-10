@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { createFixtureServer } from '../../../../../fixtures/server/server.mjs';
-import { DEFAULT_OAUTH2, type RequestDoc } from '../../shared/model';
+import { emptyAuth, type RequestDoc } from '../../shared/model';
 import { getAgents, prepare, run, PrepareError, setUserAgent } from './runner';
 
 let server: Server;
@@ -25,7 +25,7 @@ const doc = (over: Partial<RequestDoc> = {}): RequestDoc => ({
   params: [],
   headers: [],
   body: { mode: 'none', json: '', text: '', xml: '', formUrlEncoded: [], multipartForm: [] },
-  auth: { mode: 'none', bearer: { token: '' }, basic: { username: '', password: '' }, apikey: { key: '', value: '', placement: 'header' }, oauth2: { ...DEFAULT_OAUTH2 } },
+  auth: { ...emptyAuth(), mode: 'none' },
   vars: { req: [], res: [] },
   script: { req: '', res: '' },
   tests: '',

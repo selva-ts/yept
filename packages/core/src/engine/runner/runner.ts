@@ -13,7 +13,7 @@ import type { Readable } from 'node:stream';
 import axios, { type AxiosError, type AxiosResponse } from 'axios';
 import { interpolate, utils as brunoUtils } from '@usebruno/common';
 import { caOptions } from '../net/ca';
-import { OAUTH2_CLIENT_CREDENTIALS, type AuthConfig, type CookieUse, type ExtractionResult, type HttpMethod, type KeyValue, type NetworkHop, type OAuth2Use, type RequestDoc, type RunResult, type ScriptRequest, type ScriptStage, type SettingsDoc, type TestResult, type TimelineEntry } from '../../shared/model';
+import { AUTH_MODES, OAUTH2_CLIENT_CREDENTIALS, type AuthConfig, type CookieUse, type ExtractionResult, type HttpMethod, type KeyValue, type NetworkHop, type OAuth2Use, type RequestDoc, type RunResult, type ScriptRequest, type ScriptStage, type SettingsDoc, type TestResult, type TimelineEntry } from '../../shared/model';
 import { findUnresolved } from '../../shared/vars';
 import { emptyEnvLayer, envVariables, resolveLayers, type VarLayers } from '../env/variables';
 import type { RawResult, SandboxHooks, SandboxHost, ScriptSendReply, SandboxRequest, SandboxResponse, SandboxResult } from '../sandbox/host';
@@ -25,6 +25,8 @@ import { cookieMetadata } from '../../shared/run-cookies';
 import { describeParts } from '../../shared/multipart';
 import { MultipartFileError, encodeMultipart, loadParts, type EncodedMultipart, type MultipartInput, type MultipartPart } from './multipart';
 import { MAX_SCRIPT_REQUESTS, ScriptRequestError, prepareScriptRequest, scriptOptions, scriptReply, scriptRequestDoc } from './script-requests';
+import { ChallengeError, challengeAuth } from '../auth/challenge';
+import { sha256Hex, signRequest } from '../auth/aws-sigv4';
 
 export { findUnresolved };
 
@@ -95,17 +97,21 @@ export const userAgent = (): string => USER_AGENT;
 
 const TEXT_TYPES = /^(text\/|application\/(json|xml|javascript|x-www-form-urlencoded|problem\+json|[\w.+-]+\+(json|xml)))/i;
 
-const agentCache = new Map<string, { http: http.Agent; https: https.Agent }>();
-export function getAgents(tls?: RunOptions['tls']): { http: http.Agent; https: https.Agent } {
-  // OS certificate store + Node roots, so the trusted ASP.NET dev cert works; plus any extra CA.
+type Agents = { http: http.Agent; https: https.Agent };
+
+/** OS certificate store + Node roots, so the trusted ASP.NET dev cert works; plus any extra CA. */
+const newAgents = (tls?: RunOptions['tls'], extra: http.AgentOptions = {}): Agents => ({
+  http: new http.Agent({ keepAlive: true, ...extra }),
+  https: new https.Agent({ keepAlive: true, ...extra, ...caOptions(tls?.ca), rejectUnauthorized: !tls?.skipVerify })
+});
+
+const agentCache = new Map<string, Agents>();
+export function getAgents(tls?: RunOptions['tls']): Agents {
   // Keyed by the full CA content: certificates of the same length often share their opening characters.
   const key = createHash('sha256').update(JSON.stringify([!!tls?.skipVerify, tls?.ca ?? []])).digest('hex');
   let a = agentCache.get(key);
   if (!a) {
-    a = {
-      http: new http.Agent({ keepAlive: true }),
-      https: new https.Agent({ keepAlive: true, ...caOptions(tls?.ca), rejectUnauthorized: !tls?.skipVerify })
-    };
+    a = newAgents(tls);
     agentCache.set(key, a);
   }
   return a;
@@ -168,6 +174,23 @@ function authValues(auth: AuthConfig): string[] {
   if (auth.mode === 'basic') return [auth.basic.username, auth.basic.password];
   if (auth.mode === 'apikey') return [auth.apikey.key, auth.apikey.value];
   if (auth.mode === 'oauth2') return oauth2Fields(auth.oauth2);
+  if (auth.mode === 'digest') return [auth.digest.username, auth.digest.password];
+  if (auth.mode === 'ntlm') return [auth.ntlm.username, auth.ntlm.password, auth.ntlm.domain];
+  if (auth.mode === 'awsv4') {
+    const w = auth.awsv4;
+    return [w.accessKeyId, w.secretAccessKey, w.sessionToken, w.service, w.region];
+  }
+  return [];
+}
+
+/** Auth values never shown: masked in results and the console, redacted in history. */
+function authSecrets(auth: AuthConfig): string[] {
+  if (auth.mode === 'basic') return [auth.basic.password];
+  if (auth.mode === 'bearer') return [auth.bearer.token];
+  if (auth.mode === 'apikey') return [auth.apikey.value];
+  if (auth.mode === 'digest') return [auth.digest.password];
+  if (auth.mode === 'ntlm') return [auth.ntlm.password];
+  if (auth.mode === 'awsv4') return [auth.awsv4.secretAccessKey, auth.awsv4.sessionToken];
   return [];
 }
 
@@ -196,7 +219,7 @@ export function prepare(doc: RequestDoc, vars: Record<string, unknown>, auth: Au
   const parts = doc.body.mode === 'multipartForm' ? (doc.body.multipartForm ?? []).filter((f) => f.enabled && f.name.trim() !== '') : [];
   const bodyText = doc.body.mode === 'json' ? doc.body.json : doc.body.mode === 'text' ? doc.body.text : doc.body.mode === 'xml' ? doc.body.xml : undefined;
   const pathParams = doc.params.filter((p) => p.enabled && p.type === 'path');
-  if (!(['none', 'inherit', 'bearer', 'basic', 'apikey', 'oauth2'] as string[]).includes(auth.mode)) {
+  if (!(AUTH_MODES as readonly string[]).includes(auth.mode)) {
     throw new PrepareError(`Auth mode "${auth.mode}" isn't supported by Yept yet. Use a bearer token or set the header yourself.`);
   }
   if (auth.mode === 'oauth2' && auth.oauth2.grantType !== OAUTH2_CLIENT_CREDENTIALS) {
@@ -253,6 +276,17 @@ export function prepare(doc: RequestDoc, vars: Record<string, unknown>, auth: Au
     }
   }
   if (auth.mode === 'apikey' && auth.apikey.placement === 'header' && auth.apikey.key) out[I(auth.apikey.key)] = I(auth.apikey.value);
+  // Digest and NTLM answer the server's challenge, and AWS signs the final request: the runner does those when sending.
+  if (auth.mode === 'awsv4' && !hasHeader('authorization')) {
+    const w = auth.awsv4;
+    if (!I(w.accessKeyId).trim() || !I(w.secretAccessKey).trim()) {
+      throw new PrepareError(w.profileName.trim() && !w.accessKeyId.trim() ? `AWS profile "${w.profileName}" can't be read by Yept. Enter the access key ID and secret access key instead.` : 'AWS access key ID and secret access key are required');
+    }
+    if (!I(w.service).trim() || !I(w.region).trim()) throw new PrepareError('AWS service and region are required');
+  }
+  if ((auth.mode === 'digest' || auth.mode === 'ntlm') && !hasHeader('authorization') && !I(auth[auth.mode].username).trim()) {
+    throw new PrepareError(`${auth.mode === 'digest' ? 'Digest' : 'NTLM'} username is empty`);
+  }
 
   let data: string | undefined;
   if (bodyText !== undefined && bodyText !== '') data = doc.body.mode === 'json' ? interpolateJson(bodyText, vars) : I(bodyText);
@@ -588,13 +622,17 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
   };
   const sentBody = (): Pick<RunResult, 'requestBody' | 'multipart'> => (parts ? { requestBody: describeParts(parts), multipart: parts } : { requestBody: prepared.data });
   withBody(prepared);
+  const I = (s: string): string => String(interpolate(s, vars));
   // Mask credentials that came from auth settings too (e.g. a Basic password typed into the request).
-  if (auth.mode === 'basic') extraMask.push(String(interpolate(auth.basic.password, vars)));
-  if (auth.mode === 'bearer') extraMask.push(String(interpolate(auth.bearer.token, vars)));
-  if (auth.mode === 'apikey') extraMask.push(String(interpolate(auth.apikey.value, vars)));
+  for (const v of authSecrets(auth)) extraMask.push(I(v));
 
   const timeoutMs = snapshot.settings.timeoutMs > 0 ? snapshot.settings.timeoutMs : opts.defaultTimeoutMs;
-  const { http: httpAgent, https: httpsAgent } = getAgents(opts.tls);
+  // An Authorization header set on the request wins over the auth settings.
+  const ownAuthorization = Object.keys(prepared.headers).some((k) => k.toLowerCase() === 'authorization');
+  const challenge = opts.prepared || ownAuthorization ? null : challengeAuth(auth, I);
+  // NTLM authenticates the connection, so its handshake gets one of its own, closed after the run.
+  const ownAgents = challenge?.sameConnection ? newAgents(opts.tls, { maxSockets: 1 }) : undefined;
+  const { http: httpAgent, https: httpsAgent } = ownAgents ?? getAgents(opts.tls);
 
   // ---------- OAuth2: a cached token, or a new one (shared with sends running at the same time) ----------
   const tokenCache = opts.oauth2?.cache ?? new TokenCache();
@@ -660,6 +698,21 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
     for (const name of jar.store(url, Array.isArray(setCookie) ? setCookie : [setCookie])) if (!use.stored.includes(name)) use.stored.push(name);
   };
 
+  // AWS: signed last, over the request exactly as it will go out (cookies included, the body hashed).
+  if (auth.mode === 'awsv4' && !ownAuthorization && !opts.prepared) {
+    const w = auth.awsv4;
+    let bodyHash: string;
+    try {
+      bodyHash = encoded ? await hashStream(encoded.stream()) : sha256Hex(prepared.data ?? '');
+    } catch (e) {
+      return notSent({ outcome: 'prepare_error', message: `Couldn't read the body to sign it: ${(e as Error).message}` });
+    }
+    const creds = { accessKeyId: I(w.accessKeyId).trim(), secretAccessKey: I(w.secretAccessKey).trim(), sessionToken: I(w.sessionToken).trim() || undefined, service: I(w.service).trim(), region: I(w.region).trim() };
+    Object.assign(prepared.headers, signRequest({ method: prepared.method, url: prepared.url, headers: prepared.headers, bodyHash }, creds));
+    timeline.push({ atMs: at(), label: 'AWS Signature v4', detail: `Signed for ${creds.service} in ${creds.region}` });
+  }
+  if (challenge?.initial) prepared.headers.Authorization = challenge.initial;
+
   let requestInfo: RunResult['request'] = { method: prepared.method, url: prepared.url, headers: Object.entries(prepared.headers) };
   timeline.push({ atMs: at(), label: 'Request sent', detail: `${prepared.method} ${prepared.url}${opts.tls?.skipVerify ? ' (TLS verification off)' : ''}` });
 
@@ -677,6 +730,8 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
   const finish = (): void => {
     clearTimeout(deadline);
     opts.signal?.removeEventListener('abort', onUserAbort);
+    ownAgents?.http.destroy();
+    ownAgents?.https.destroy();
   };
 
   const recorder = new WireRecorder();
@@ -725,6 +780,33 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
     return failed(e);
   }
   storeCookies(recorder.hops.at(-1)?.url ?? prepared.url, response.headers['set-cookie']);
+
+  // ---------- Digest and NTLM: answer the server's 401 challenge and send once more ----------
+  if (challenge && response.status === 401) {
+    const header = response.headers['www-authenticate'];
+    let answer: string | null = null;
+    let note = `The 401 response has no ${challenge.name} challenge`;
+    try {
+      answer = challenge.answer(Array.isArray(header) ? header.join(', ') : String(header ?? ''), prepared.method, prepared.url);
+    } catch (e) {
+      if (!(e instanceof ChallengeError)) throw e;
+      note = `Not answered: ${e.message}`;
+    }
+    if (answer === null) timeline.push({ atMs: at(), label: `${challenge.name} challenge`, detail: note });
+    else {
+      // Read the 401 to the end, so its connection is free for the next send (NTLM needs that very connection).
+      await drain(response.data);
+      prepared.headers.Authorization = answer;
+      requestInfo = { method: prepared.method, url: prepared.url, headers: Object.entries(prepared.headers) };
+      timeline.push({ atMs: at(), label: `${challenge.name} challenge`, detail: 'Re-sent with credentials' });
+      try {
+        response = await send(prepared);
+      } catch (e) {
+        return failed(e);
+      }
+      storeCookies(recorder.hops.at(-1)?.url ?? prepared.url, response.headers['set-cookie']);
+    }
+  }
 
   // ---------- OAuth2: a 401 for a cached token means it was revoked or expired early ----------
   // A token fetched for this run is never retried: a 401 then points at the configuration, not the token.
@@ -919,7 +1001,22 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
 
 
 /** Request header names whose values are never shown, even outside history. */
-const SENT_SENSITIVE = /^(authorization|proxy-authorization|cookie)$/i;
+const SENT_SENSITIVE = /^(authorization|proxy-authorization|cookie|x-amz-security-token)$/i;
+
+/** Reads a response body to the end without keeping it. */
+const drain = (s: Readable): Promise<void> =>
+  new Promise((resolve) => {
+    s.once('end', resolve);
+    s.once('close', resolve);
+    s.once('error', () => resolve());
+    s.resume();
+  });
+
+async function hashStream(s: Readable): Promise<string> {
+  const h = createHash('sha256');
+  for await (const chunk of s) h.update(chunk as Buffer);
+  return h.digest('hex');
+}
 
 /** "52 min", for timeline entries about token expiry. */
 const expiresIn = (at: number): string => {

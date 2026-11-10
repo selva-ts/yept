@@ -101,6 +101,50 @@ describe('import', () => {
     expect(request.request.auth.oauth2.clientSecret).toBe('{{clientSecret}}');
   });
 
+  it('imports Postman digest, AWS and NTLM auth, moving literal secrets to secret variables', async () => {
+    const raw = JSON.parse(readFileSync(join(FIX, 'import', 'postman-sample.postman_collection.json'), 'utf8'));
+    const kv = (o: Record<string, string>): { key: string; value: string; type: string }[] => Object.entries(o).map(([key, value]) => ({ key, value, type: 'string' }));
+    const login = raw.item[0].item[0];
+    raw.item[0].item = [
+      { ...login, name: 'Digest', request: { ...login.request, auth: { type: 'digest', digest: kv({ username: 'sample-user', password: 'literal-digest-pass' }) } } },
+      { ...login, name: 'AWS', request: { ...login.request, auth: { type: 'awsv4', awsv4: kv({ accessKey: '{{awsKeyId}}', secretKey: 'literal/aws/secret/access/key', sessionToken: 'literalSessionTokenValue1234', service: 'execute-api', region: 'eu-west-1' }) } } },
+      { ...login, name: 'NTLM', request: { ...login.request, auth: { type: 'ntlm', ntlm: kv({ username: 'sample-user', password: 'literal-ntlm-pass', domain: 'SAMPLE' }) } } }
+    ];
+    const src = await convertSource(JSON.stringify(raw), 'p.json');
+    const findings = findSecrets(src.model);
+    expect(findings.map((f) => f.field)).toEqual(expect.arrayContaining(['digest password', 'aws secret access key', 'aws session token', 'ntlm password']));
+    const values = applySecretFixes(src.model, new Set(findings.map((f) => f.id)));
+    expect(values).toEqual(expect.arrayContaining([
+      { name: 'digestPassword', value: 'literal-digest-pass', environment: null },
+      { name: 'awsSecretAccessKey', value: 'literal/aws/secret/access/key', environment: null },
+      { name: 'awsSessionToken', value: 'literalSessionTokenValue1234', environment: null },
+      { name: 'ntlmPassword', value: 'literal-ntlm-pass', environment: null }
+    ]));
+    const all = buildPlan(src.model, join(dir, 'ws')).files.map((f) => f.content).join('\n');
+    expect(all).not.toMatch(/literal-digest-pass|literal\/aws|literalSessionToken|literal-ntlm-pass/);
+    expect(all).toContain('type: digest');
+    expect(all).toMatch(/type: awsv4\n\s+accessKeyId: "\{\{awsKeyId\}\}"\n\s+secretAccessKey: "\{\{awsSecretAccessKey\}\}"/);
+    expect(all).toMatch(/type: ntlm\n\s+username: sample-user\n\s+password: "\{\{ntlmPassword\}\}"\n\s+domain: SAMPLE/);
+  });
+
+  it('imports Insomnia digest, AWS (iam) and NTLM auth, which the converter leaves out', async () => {
+    const raw = JSON.parse(readFileSync(join(FIX, 'import', 'insomnia-sample.json'), 'utf8'));
+    const list = raw.resources.find((r: any) => r._id === 'req_list');
+    raw.resources.push(
+      { ...list, _id: 'req_digest', name: 'Digest', authentication: { type: 'digest', username: '{{ _.user }}', password: '{{ _.digestPassword }}' } },
+      { ...list, _id: 'req_aws', name: 'AWS', authentication: { type: 'iam', accessKeyId: '{{ _.awsKeyId }}', secretAccessKey: 'literal/aws/secret/access/key', sessionToken: '', service: 'execute-api', region: 'eu-west-1' } },
+      { ...list, _id: 'req_ntlm', name: 'NTLM', authentication: { type: 'ntlm', username: 'sample-user', password: '{{ _.ntlmPassword }}' } },
+      { ...list, _id: 'req_off', name: 'Off', authentication: { type: 'digest', username: 'u', password: 'p', disabled: true } }
+    );
+    const src = await convertSource(JSON.stringify(raw), 'i.json');
+    const auth = (name: string): any => src.model.items.find((i: any) => i.name === name).request.auth;
+    expect(auth('Digest')).toMatchObject({ mode: 'digest', digest: { username: '{{user}}', password: '{{digestPassword}}' } });
+    expect(auth('AWS')).toMatchObject({ mode: 'awsv4', awsv4: { accessKeyId: '{{awsKeyId}}', service: 'execute-api', region: 'eu-west-1' } });
+    expect(auth('NTLM')).toMatchObject({ mode: 'ntlm', ntlm: { username: 'sample-user', password: '{{ntlmPassword}}' } });
+    expect(auth('Off').mode).toBe('none');
+    expect(findSecrets(src.model).map((f) => f.field)).toEqual(['aws secret access key']);
+  });
+
   it('handles an existing target folder: copy, skip or replace (never deletes)', async () => {
     const text = readFileSync(join(FIX, 'import', 'openapi-sample.yaml'), 'utf8');
     const plan1 = buildPlan((await convertSource(text, 'a.yaml')).model, join(dir, 'ws'));
