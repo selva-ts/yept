@@ -64,10 +64,10 @@ export interface RequestSettings {
 }
 
 /**
- * Auth modes Yept edits. Other Bruno modes (digest, awsv4, ...) and OAuth2 grant types other than client
+ * Auth modes Yept edits. Other Bruno modes (wsse, oauth1, ...) and OAuth2 grant types other than client
  * credentials are shown read-only and kept unchanged on save.
  */
-export const AUTH_MODES = ['inherit', 'none', 'bearer', 'basic', 'apikey', 'oauth2'] as const;
+export const AUTH_MODES = ['inherit', 'none', 'bearer', 'basic', 'apikey', 'oauth2', 'digest', 'awsv4', 'ntlm'] as const;
 export type EditableAuthMode = (typeof AUTH_MODES)[number];
 
 /** The only OAuth2 grant type Yept can send. */
@@ -101,6 +101,20 @@ export const DEFAULT_OAUTH2: OAuth2Config = {
   autoFetchToken: true, autoRefreshToken: true
 };
 
+/** AWS Signature Version 4. */
+export interface AwsV4Config {
+  accessKeyId: string;
+  secretAccessKey: string;
+  /** Temporary credentials only; '' sends none. */
+  sessionToken: string;
+  /** e.g. 'execute-api', 's3'. */
+  service: string;
+  /** e.g. 'eu-west-1'. */
+  region: string;
+  /** Bruno's AWS profile name. Yept doesn't read AWS profiles: it's kept unchanged in the file. */
+  profileName: string;
+}
+
 export interface AuthConfig {
   /** One of AUTH_MODES, or another Bruno mode kept as-is. */
   mode: string;
@@ -108,7 +122,25 @@ export interface AuthConfig {
   basic: { username: string; password: string };
   apikey: { key: string; value: string; placement: 'header' | 'queryparams' };
   oauth2: OAuth2Config;
+  digest: { username: string; password: string };
+  awsv4: AwsV4Config;
+  /** Bruno's NTLM has no workstation field; Yept sends none. */
+  ntlm: { username: string; password: string; domain: string };
 }
+
+export const EMPTY_AWSV4: AwsV4Config = { accessKeyId: '', secretAccessKey: '', sessionToken: '', service: '', region: '', profileName: '' };
+
+/** Auth with nothing set: the starting point for code that builds an AuthConfig. */
+export const emptyAuth = (): AuthConfig => ({
+  mode: 'none',
+  bearer: { token: '' },
+  basic: { username: '', password: '' },
+  apikey: { key: '', value: '', placement: 'header' },
+  oauth2: { ...DEFAULT_OAUTH2 },
+  digest: { username: '', password: '' },
+  awsv4: { ...EMPTY_AWSV4 },
+  ntlm: { username: '', password: '', domain: '' }
+});
 
 /** True when Yept can edit and send this auth (OAuth2 only with client credentials). */
 export function isEditableAuth(auth: AuthConfig): boolean {
@@ -544,7 +576,9 @@ export interface LeakFinding {
 export interface ImportSecretFinding {
   id: string;
   where: string;
-  field: 'bearer token' | 'basic password' | 'api key' | 'client secret' | 'authorization header' | 'environment value';
+  field:
+    | 'bearer token' | 'basic password' | 'api key' | 'client secret' | 'digest password' | 'ntlm password' | 'aws secret access key' | 'aws session token'
+    | 'authorization header' | 'environment value';
   variable: string;
   preview: string;
 }

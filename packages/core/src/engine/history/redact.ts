@@ -7,7 +7,7 @@ export interface NamedSecret {
   value: string;
 }
 
-const SENSITIVE_HEADERS = /^(authorization|proxy-authorization|cookie|set-cookie)$/i;
+const SENSITIVE_HEADERS = /^(authorization|proxy-authorization|cookie|set-cookie|x-amz-security-token)$/i;
 export const REDACTED = '«redacted»';
 
 /** Replaces every known secret value with «secret:name». Longest values first, so overlapping secrets mask fully. */

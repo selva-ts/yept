@@ -7,7 +7,7 @@
 //   error: { name, message, code, status, response }
 // As in Bruno, nothing in the options is interpolated: scripts build values with bru.getEnvVar() and friends.
 import { utils as brunoUtils } from '@usebruno/common';
-import { DEFAULT_OAUTH2, HTTP_METHODS, type HttpMethod, type RequestDoc } from '../../shared/model';
+import { emptyAuth, HTTP_METHODS, type HttpMethod, type RequestDoc } from '../../shared/model';
 import type { ScriptHttpError, ScriptHttpResponse, ScriptSendReply } from '../sandbox/host';
 import type { MultipartInput } from './multipart';
 import type { Prepared, RunOutput } from './runner';
@@ -104,7 +104,7 @@ export function scriptRequestDoc(o: ScriptRequestOptions, prepared: Prepared): R
     params: [],
     headers: [],
     body: { mode: 'none', json: '', text: '', xml: '', formUrlEncoded: [], multipartForm: [] },
-    auth: { mode: 'none', bearer: { token: '' }, basic: { username: '', password: '' }, apikey: { key: '', value: '', placement: 'header' }, oauth2: { ...DEFAULT_OAUTH2 } },
+    auth: { ...emptyAuth(), mode: 'none' },
     vars: { req: [], res: [] },
     script: { req: '', res: '' },
     tests: '',

@@ -1,11 +1,14 @@
-import { AUTH_MODES, isEditableAuth, type AuthConfig, type OAuth2Config } from '@shared/model';
+import { AUTH_MODES, isEditableAuth, type AuthConfig, type AwsV4Config, type OAuth2Config } from '@shared/model';
 import { looksLikeSecret, type SecretField } from '@shared/secrets';
 import { errorMessage, yept } from '../api';
 import { useStore } from '../store';
 import { VarInput } from './VarInput';
 import { prompt } from './Dialogs';
 
-const LABELS: Record<string, string> = { inherit: 'Inherit', none: 'No auth', bearer: 'Bearer token', basic: 'Basic', apikey: 'API key', oauth2: 'OAuth2 client credentials' };
+const LABELS: Record<string, string> = {
+  inherit: 'Inherit', none: 'No auth', bearer: 'Bearer token', basic: 'Basic', apikey: 'API key', oauth2: 'OAuth2 client credentials',
+  digest: 'Digest', awsv4: 'AWS Signature v4', ntlm: 'NTLM'
+};
 
 interface Props {
   auth: AuthConfig;
@@ -53,6 +56,10 @@ export function AuthEditor({ auth, onChange, readOnly, allowInherit, collectionI
   const modes = AUTH_MODES.filter((m) => allowInherit || m !== 'inherit');
   const o = auth.oauth2;
   const setOAuth = (patch: Partial<OAuth2Config>): void => onChange({ ...auth, oauth2: { ...o, ...patch } });
+  const w = auth.awsv4;
+  const setAws = (patch: Partial<AwsV4Config>): void => onChange({ ...auth, awsv4: { ...w, ...patch } });
+  const setDigest = (patch: Partial<AuthConfig['digest']>): void => onChange({ ...auth, digest: { ...auth.digest, ...patch } });
+  const setNtlm = (patch: Partial<AuthConfig['ntlm']>): void => onChange({ ...auth, ntlm: { ...auth.ntlm, ...patch } });
   const row = (label: string, el: React.ReactNode): React.JSX.Element => (
     <label className="field-row">
       <span className="field-label">{label}</span>
@@ -139,6 +146,40 @@ export function AuthEditor({ auth, onChange, readOnly, allowInherit, collectionI
             Tokens are kept in memory for each environment, never in files, and a restart gets a new one. If the server rejects a cached token with 401, a GET, HEAD or OPTIONS request is re-sent once with a new
             token; other requests are not re-sent automatically, because they may change data.
           </p>
+        </div>
+      )}
+      {auth.mode === 'digest' && (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {row('Username', <VarInput className="input mono" value={auth.digest.username} readOnly={readOnly} placeholder="{{username}}" spellCheck={false} onChange={(e) => setDigest({ username: e.target.value })} aria-label="Digest username" />)}
+          {row('Password', <VarInput className="input mono" value={auth.digest.password} readOnly={readOnly} placeholder="{{password}}" spellCheck={false} onChange={(e) => setDigest({ password: e.target.value })} aria-label="Digest password" />)}
+          <SecretHint value={auth.digest.password} field="password" collectionId={collectionId} suggestedName="digestPassword" onReplace={(ref) => setDigest({ password: ref })} />
+          <p className="mute small">The request is sent, the server answers 401 with a Digest challenge, and the request is sent once more with the answer. MD5, SHA-256 and SHA-512-256 (also -sess), qop auth.</p>
+        </div>
+      )}
+      {auth.mode === 'ntlm' && (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {row('Username', <VarInput className="input mono" value={auth.ntlm.username} readOnly={readOnly} placeholder="{{username}}" spellCheck={false} onChange={(e) => setNtlm({ username: e.target.value })} aria-label="NTLM username" />)}
+          {row('Password', <VarInput className="input mono" value={auth.ntlm.password} readOnly={readOnly} placeholder="{{password}}" spellCheck={false} onChange={(e) => setNtlm({ password: e.target.value })} aria-label="NTLM password" />)}
+          <SecretHint value={auth.ntlm.password} field="password" collectionId={collectionId} suggestedName="ntlmPassword" onReplace={(ref) => setNtlm({ password: ref })} />
+          {row('Domain', <VarInput className="input mono" value={auth.ntlm.domain} readOnly={readOnly} placeholder="Optional, e.g. CORP" spellCheck={false} onChange={(e) => setNtlm({ domain: e.target.value })} aria-label="NTLM domain" />)}
+          <p className="mute small">NTLMv2, with the handshake on a connection of its own. <code>DOMAIN\user</code> in the username works too.</p>
+        </div>
+      )}
+      {auth.mode === 'awsv4' && (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {row('Access key ID', <VarInput className="input mono" value={w.accessKeyId} readOnly={readOnly} placeholder="{{awsAccessKeyId}}" spellCheck={false} onChange={(e) => setAws({ accessKeyId: e.target.value })} aria-label="AWS access key ID" />)}
+          {row('Secret access key', <VarInput className="input mono" value={w.secretAccessKey} readOnly={readOnly} placeholder="{{awsSecretAccessKey}}" spellCheck={false} onChange={(e) => setAws({ secretAccessKey: e.target.value })} aria-label="AWS secret access key" />)}
+          <SecretHint value={w.secretAccessKey} field="password" collectionId={collectionId} suggestedName="awsSecretAccessKey" onReplace={(ref) => setAws({ secretAccessKey: ref })} />
+          {row('Session token', <VarInput className="input mono" value={w.sessionToken} readOnly={readOnly} placeholder="Optional, for temporary credentials" spellCheck={false} onChange={(e) => setAws({ sessionToken: e.target.value })} aria-label="AWS session token" />)}
+          <SecretHint value={w.sessionToken} field="token" collectionId={collectionId} suggestedName="awsSessionToken" onReplace={(ref) => setAws({ sessionToken: ref })} />
+          {row('Service', <VarInput className="input mono" value={w.service} readOnly={readOnly} placeholder="execute-api" spellCheck={false} onChange={(e) => setAws({ service: e.target.value })} aria-label="AWS service" />)}
+          {row('Region', <VarInput className="input mono" value={w.region} readOnly={readOnly} placeholder="eu-west-1" spellCheck={false} onChange={(e) => setAws({ region: e.target.value })} aria-label="AWS region" />)}
+          {w.profileName && (
+            <p className="mute small">
+              This file names the AWS profile <code>{w.profileName}</code>. It's kept in the file, but Yept doesn't read AWS profiles: enter the keys above.
+            </p>
+          )}
+          <p className="mute small">The request is signed just before it's sent, after variables are filled in, so the signature covers the final URL, headers and body.</p>
         </div>
       )}
     </div>

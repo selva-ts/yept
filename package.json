@@ -20,7 +20,7 @@
     "fixture-server": "node fixtures/server/server.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "npm run build && node e2e/home.mjs && node e2e/requests.mjs && node e2e/environments.mjs && node e2e/history-tests.mjs && node e2e/git-import.mjs && node e2e/git-sync.mjs && node e2e/devtools.mjs && node e2e/script-requests.mjs && node e2e/collection-runner.mjs && node e2e/response-cookies.mjs && node e2e/oauth2.mjs && node e2e/multipart.mjs && node e2e/response-html.mjs && node e2e/appearance.mjs && node e2e/about.mjs"
+    "e2e": "npm run build && node e2e/home.mjs && node e2e/requests.mjs && node e2e/environments.mjs && node e2e/history-tests.mjs && node e2e/git-import.mjs && node e2e/git-sync.mjs && node e2e/devtools.mjs && node e2e/script-requests.mjs && node e2e/collection-runner.mjs && node e2e/response-cookies.mjs && node e2e/oauth2.mjs && node e2e/auth-modes.mjs && node e2e/multipart.mjs && node e2e/response-html.mjs && node e2e/appearance.mjs && node e2e/about.mjs"
   },
   "dependencies": {
     "@usebruno/common": "0.26.0",

@@ -12,7 +12,7 @@ The application is MIT licensed, needs no Yept account and has no telemetry. Col
 ## What it does
 
 - Edit requests with headers, query parameters, JSON, text, XML, URL-encoded forms and multipart file uploads.
-- Use environments and encrypted local secrets, bearer/basic/API-key auth, and OAuth2 client credentials with token caching.
+- Use environments and encrypted local secrets; bearer, basic, API key, Digest, NTLM and AWS Signature v4 auth; and OAuth2 client credentials with token caching.
 - Run pre/post-request scripts, assertions and a sequential collection runner. Unresolved variables block sending.
 - Inspect redirect hops, sent headers, timings, TLS details, cookies, reconstructed raw HTTP and masked cURL exports in Dev tools.
 - Keep response history with redaction before storage, and follow requests across renames.
@@ -108,6 +108,7 @@ The [desktop validation workflow](.github/workflows/ci.yml) checks pull requests
 
 - HTTP request workflows only: no dedicated WebSocket, gRPC or MQTT client, CLI runner or cloud collaboration service.
 - OAuth2 client credentials only; no authorization-code/PKCE, password/implicit flows or refresh-token flow.
+- No Kerberos/Negotiate or proxy auth. AWS Signature v4 needs the access keys in the request: AWS profiles are not read.
 - Collection runs are sequential, with no data files, iterations, schedules, parallel runs or report export.
 - Bruno compatibility is limited to the supported file fields and script APIs. `.bru` collections open read-only and can be converted to YAML. Unsupported body types are retained when editing other fields but cannot be sent until changed to a supported type. `bru.runRequest` and multipart file sends through `bru.sendRequest` are unavailable.
 - Scripts have a five-second execution limit. `bru.sendRequest` shares that limit and permits at most ten requests per script.

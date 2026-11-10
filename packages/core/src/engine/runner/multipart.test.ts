@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { createFixtureServer } from '../../../../../fixtures/server/server.mjs';
-import type { MultipartField, RequestDoc } from '../../shared/model';
+import { emptyAuth, type MultipartField, type RequestDoc } from '../../shared/model';
 import { localFileMap, multipartKey, pathLocation, withLocalFiles } from '../../shared/multipart';
 import { emptyEnvLayer, type VarLayers } from '../env/variables';
 import { redactResult } from '../history/redact';
@@ -55,7 +55,7 @@ const file = (name: string, files: string[], over: Partial<MultipartField> = {})
 const doc = (fields: MultipartField[], over: Partial<RequestDoc> = {}): RequestDoc => ({
   name: 'Upload', method: 'POST', url: '{{baseUrl}}/upload', params: [], headers: [],
   body: { mode: 'multipartForm', json: '', text: '', xml: '', formUrlEncoded: [], multipartForm: fields },
-  auth: { mode: 'none', bearer: { token: '' }, basic: { username: '', password: '' }, apikey: { key: '', value: '', placement: 'header' }, oauth2: {} as never },
+  auth: { ...emptyAuth(), mode: 'none' },
   vars: { req: [], res: [] }, script: { req: '', res: '' }, tests: '', assertions: [], docs: '',
   settings: { encodeUrl: true, timeoutMs: 0, followRedirects: true, maxRedirects: 5, forwardAuthorizationHeader: false, sendCookies: true },
   ...over

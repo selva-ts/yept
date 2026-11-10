@@ -7,7 +7,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createFixtureServer } from '../../../../../fixtures/server/server.mjs';
-import { DEFAULT_OAUTH2, type AuthConfig, type RequestDoc } from '../../shared/model';
+import { emptyAuth, type AuthConfig, type RequestDoc } from '../../shared/model';
 import { SandboxHost } from '../sandbox/host';
 import { run, type RunOptions } from '../runner/runner';
 import type { Cipher } from '../env/local-store';
@@ -45,7 +45,7 @@ const fresh = (): CookieStore => {
 };
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-const noAuth: AuthConfig = { mode: 'none', bearer: { token: '' }, basic: { username: '', password: '' }, apikey: { key: '', value: '', placement: 'header' }, oauth2: { ...DEFAULT_OAUTH2 } };
+const noAuth: AuthConfig = { ...emptyAuth(), mode: 'none' };
 const doc = (url: string, over: Partial<RequestDoc> = {}): RequestDoc => ({
   name: 't', method: 'GET', url: `${base}${url}`, params: [], headers: [],
   body: { mode: 'none', json: '', text: '', xml: '', formUrlEncoded: [], multipartForm: [] },

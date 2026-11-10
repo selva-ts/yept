@@ -69,7 +69,17 @@ export function toAuth(a: any, defaultMode: string): AuthConfig {
           autoFetchToken: o.autoFetchToken !== false,
           autoRefreshToken: o.autoRefreshToken === true
         }
-      : { ...DEFAULT_OAUTH2 }
+      : { ...DEFAULT_OAUTH2 },
+    digest: { username: text(a?.digest?.username), password: text(a?.digest?.password) },
+    awsv4: {
+      accessKeyId: text(a?.awsv4?.accessKeyId),
+      secretAccessKey: text(a?.awsv4?.secretAccessKey),
+      sessionToken: text(a?.awsv4?.sessionToken),
+      service: text(a?.awsv4?.service),
+      region: text(a?.awsv4?.region),
+      profileName: text(a?.awsv4?.profileName)
+    },
+    ntlm: { username: text(a?.ntlm?.username), password: text(a?.ntlm?.password), domain: text(a?.ntlm?.domain) }
   };
 }
 
@@ -97,6 +107,13 @@ function applyAuth(original: any, auth: AuthConfig): any {
       autoFetchToken: o.autoFetchToken,
       autoRefreshToken: o.autoRefreshToken
     };
+  }
+  // Bruno reads a missing field as null and writes only the fields that are set, so '' is written as null.
+  if (auth.mode === 'digest') out.digest = { username: auth.digest.username || null, password: auth.digest.password || null };
+  if (auth.mode === 'ntlm') out.ntlm = { username: auth.ntlm.username || null, password: auth.ntlm.password || null, domain: auth.ntlm.domain || null };
+  if (auth.mode === 'awsv4') {
+    const w = auth.awsv4;
+    out.awsv4 = { accessKeyId: w.accessKeyId || null, secretAccessKey: w.secretAccessKey || null, sessionToken: w.sessionToken || null, service: w.service || null, region: w.region || null, profileName: w.profileName || null };
   }
   return out;
 }

@@ -339,7 +339,7 @@ function NetworkDetails({ entry, format, setFormat }: { entry: RunEntry; format:
       </div>
       <ScriptLinks entry={entry} />
       {hops.length > 1 && (
-        <div className="dt-hops" aria-label="Redirects">
+        <div className="dt-hops" aria-label="Redirects and retries">
           {hops.map((h, i) => (
             <button key={i} className={`dt-hop ${i === hopIndex ? 'active' : ''}`} onClick={() => setHopIndex(i)} title={h.url}>
               <span className={`status s${String(h.status ?? 0)[0]}`}>{h.status ?? '—'}</span> {h.method} {new URL(h.url, 'http://x').pathname}
@@ -397,6 +397,15 @@ function NetworkDetails({ entry, format, setFormat }: { entry: RunEntry; format:
   );
 }
 
+/** "(1 redirect)", or "(sent again after 401)" for an auth challenge or a rejected OAuth2 token. */
+function hopNote(hops: NetworkHop[] | undefined): React.JSX.Element | null {
+  const earlier = (hops ?? []).slice(0, -1);
+  if (!earlier.length) return null;
+  const redirects = earlier.filter((h) => h.status !== undefined && h.status >= 300 && h.status < 400).length;
+  const parts = [redirects ? `${redirects} redirect${redirects > 1 ? 's' : ''}` : '', earlier.some((h) => h.status === 401) ? 'sent again after 401' : ''].filter(Boolean);
+  return parts.length ? <span className="mute"> ({parts.join(', ')})</span> : null;
+}
+
 function NetworkTab(): React.JSX.Element {
   const { runs, selectedRunId, select } = useDevTools();
   // Table or raw headers: kept while moving between runs.
@@ -421,7 +430,7 @@ function NetworkTab(): React.JSX.Element {
                   <tr key={e.runId} className={e.runId === selectedRunId ? 'active' : ''} onClick={() => select(e.runId)} aria-selected={e.runId === selectedRunId}>
                     <td className="mono">{time(e.startedAt)}</td>
                     <td className="mono">{r?.request.method ?? e.method}</td>
-                    <td className="mono dt-ellipsis" title={e.parentRunId ? `Sent by a ${e.stage} script of ${e.requestName}: ${r?.request.url ?? e.url}` : (r?.request.url ?? e.url)}>{e.parentRunId && <span className="dt-script-tag">script</span>}{r?.request.url ?? e.url}{(r?.hops?.length ?? 0) > 1 && <span className="mute"> ({r!.hops!.length - 1} redirect{r!.hops!.length > 2 ? 's' : ''})</span>}</td>
+                    <td className="mono dt-ellipsis" title={e.parentRunId ? `Sent by a ${e.stage} script of ${e.requestName}: ${r?.request.url ?? e.url}` : (r?.request.url ?? e.url)}>{e.parentRunId && <span className="dt-script-tag">script</span>}{r?.request.url ?? e.url}{hopNote(r?.hops)}</td>
                     <td><span className={`hstatus ${o.cls}`}>{o.text}</span></td>
                     <td className="mono">{r ? formatMs(r.durationMs) : ''}</td>
                     <td className="mono">{r?.outcome === 'http' ? formatBytes(r.sizeBytes) : ''}</td>
