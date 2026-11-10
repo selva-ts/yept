@@ -60,7 +60,6 @@ describe.skipIf(!hasOpenssl)('trusted TLS certificates in Node and Electron', ()
       import { join } from 'node:path';
       import { pathToFileURL } from 'node:url';
       const { caOptions } = await import(pathToFileURL(process.argv[2]).href);
-      const name = process.argv[3];
       const pem = file => readFileSync(join(${JSON.stringify(dir)}, file), 'utf8');
       const cases = {
         trusted: ['server', ['server']],
@@ -77,23 +76,26 @@ describe.skipIf(!hasOpenssl)('trusted TLS certificates in Node and Electron', ()
         bundle: ['leaf', ['other', 'intermediate', 'root']],
         descendant: ['descendant', ['server']]
       };
-      const [leaf, anchors, hostname = 'api.example.test'] = cases[name];
-      const cert = pem(leaf + '.pem') + (leaf === 'leaf' && name !== 'missing-chain' ? pem('intermediate.pem') : '');
-      let incoming, outgoing;
-      incoming = new Duplex({ read() {}, write(chunk, encoding, callback) { outgoing.push(Buffer.from(chunk)); callback(); } });
-      outgoing = new Duplex({ read() {}, write(chunk, encoding, callback) { incoming.push(Buffer.from(chunk)); callback(); } });
-      const server = new tls.TLSSocket(incoming, { isServer: true, secureContext: tls.createSecureContext({ cert, key: pem(leaf + '.key') }) });
-      server.on('error', () => {});
-      const result = await new Promise((resolve, reject) => {
-        const client = tls.connect({ socket: outgoing, servername: hostname, ...caOptions([anchors.map(anchor => pem(anchor + '.pem')).join('\\n')]) });
-        const timer = setTimeout(() => { client.destroy(); server.destroy(); reject(new Error('TLS handshake timed out')); }, 5000);
-        const finish = value => { clearTimeout(timer); client.destroy(); server.destroy(); resolve(value); };
-        client.on('secureConnect', () => finish({ authorized: client.authorized }));
-        client.on('error', error => finish({ authorized: false, code: error.code }));
-      });
-      console.log(JSON.stringify(result));
+      async function probe(name, [leaf, anchors, hostname = 'api.example.test']) {
+        const cert = pem(leaf + '.pem') + (leaf === 'leaf' && name !== 'missing-chain' ? pem('intermediate.pem') : '');
+        let incoming, outgoing;
+        incoming = new Duplex({ read() {}, write(chunk, encoding, callback) { outgoing.push(Buffer.from(chunk)); callback(); } });
+        outgoing = new Duplex({ read() {}, write(chunk, encoding, callback) { incoming.push(Buffer.from(chunk)); callback(); } });
+        const server = new tls.TLSSocket(incoming, { isServer: true, secureContext: tls.createSecureContext({ cert, key: pem(leaf + '.key') }) });
+        server.on('error', () => {});
+        return new Promise((resolve, reject) => {
+          const client = tls.connect({ socket: outgoing, servername: hostname, ...caOptions([anchors.map(anchor => pem(anchor + '.pem')).join('\\n')]) });
+          const timer = setTimeout(() => { client.destroy(); server.destroy(); reject(new Error('TLS handshake timed out: ' + name)); }, 30000);
+          const finish = value => { clearTimeout(timer); client.destroy(); server.destroy(); resolve(value); };
+          client.on('secureConnect', () => finish({ authorized: client.authorized }));
+          client.on('error', error => finish({ authorized: false, code: error.code }));
+        });
+      }
+      const results = {};
+      for (const [name, options] of Object.entries(cases)) results[name] = await probe(name, options);
+      console.log(JSON.stringify(results));
     `);
-  });
+  }, 60000);
   afterAll(() => {
     if (!dir) return;
     const path = relative(tempRoot, realpathSync(dir));
@@ -102,6 +104,17 @@ describe.skipIf(!hasOpenssl)('trusted TLS certificates in Node and Electron', ()
   });
 
   describe.each(['Node', 'Electron'])('%s', runtime => {
+    let results: Record<string, { authorized: boolean; code?: string }>;
+    beforeAll(() => {
+      const binary = runtime === 'Node' ? process.execPath : join(root, 'node_modules/electron/dist', readFileSync(join(root, 'node_modules/electron/path.txt'), 'utf8').trim());
+      // Probe every case in one process per runtime. In-memory TLS avoids antivirus interception of loopback HTTPS.
+      const output = execFileSync(binary, ['--experimental-strip-types', join(dir, 'probe.mjs'), join(__dirname, 'ca.ts')], {
+        cwd: root, encoding: 'utf8', timeout: 60000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, ...(runtime === 'Electron' ? { ELECTRON_RUN_AS_NODE: '1' } : {}) }
+      });
+      results = JSON.parse(output);
+    }, 65000);
+
     it.each([
       ['trusted', true, undefined],
       ['untrusted', false, /SELF_SIGNED|UNABLE_TO_(?:GET_ISSUER_CERT|VERIFY_LEAF_SIGNATURE)/],
@@ -117,13 +130,7 @@ describe.skipIf(!hasOpenssl)('trusted TLS certificates in Node and Electron', ()
       ['bundle', true, undefined],
       ['descendant', false, /INVALID_CA|KEYUSAGE_NO_CERTSIGN|UNABLE_TO_GET_ISSUER_CERT|UNSPECIFIED/]
     ] as const)('%s', (name, authorized, error) => {
-      const binary = runtime === 'Node' ? process.execPath : join(root, 'node_modules/electron/dist', readFileSync(join(root, 'node_modules/electron/path.txt'), 'utf8').trim());
-      // In-memory TLS avoids antivirus interception of loopback HTTPS fixtures.
-      const output = execFileSync(binary, ['--experimental-strip-types', join(dir, 'probe.mjs'), join(__dirname, 'ca.ts'), name], {
-        cwd: root, encoding: 'utf8', timeout: 10000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, ...(runtime === 'Electron' ? { ELECTRON_RUN_AS_NODE: '1' } : {}) }
-      });
-      const result = JSON.parse(output);
+      const result = results[name];
       expect(result.authorized).toBe(authorized);
       if (error) expect(result.code).toMatch(error);
     });

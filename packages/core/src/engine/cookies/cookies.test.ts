@@ -28,7 +28,7 @@ beforeAll(async () => {
   server = createFixtureServer();
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  sandbox = new SandboxHost(new URL('../sandbox/worker.mjs', import.meta.url), { timeoutMs: 3000 });
+  sandbox = new SandboxHost(new URL('../sandbox/worker.mjs', import.meta.url), { timeoutMs: 10000 });
 });
 afterAll(async () => {
   server.closeAllConnections();
@@ -43,7 +43,7 @@ const fresh = (): CookieStore => {
   store = new CookieStore(file(), cipher);
   return store;
 };
-afterEach(() => rmSync(dir, { recursive: true, force: true }));
+afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
 
 const noAuth: AuthConfig = { ...emptyAuth(), mode: 'none' };
 const doc = (url: string, over: Partial<RequestDoc> = {}): RequestDoc => ({

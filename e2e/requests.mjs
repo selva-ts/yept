@@ -115,14 +115,15 @@ try {
 
   // 7. External change to a clean tab reloads it; to a dirty tab raises a conflict.
   await page.keyboard.press('Control+s');
-  await page.waitForTimeout(300);
   const file = join(wsDir, 'sample-travel', 'Echo test.yml');
+  await page.locator('.tab.active .dirty-dot').waitFor({ state: 'detached' });
   await fs.writeFile(file, readFileSync(file, 'utf8').replace(/url: .*/, `url: "${base}/echo?external=1"`));
-  await page.waitForFunction(() => document.querySelector('input[aria-label="URL"]')?.value.includes('external=1'), null, { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelector('input[aria-label="URL"]')?.value.includes('external=1'));
   check('external edit reloads a clean tab', true);
   await page.getByLabel('URL', { exact: true }).fill(`${base}/echo?mine=1`);
+  await page.locator('.tab.active .dirty-dot').waitFor();
   await fs.writeFile(file, readFileSync(file, 'utf8').replace(/url: .*/, `url: "${base}/echo?theirs=1"`));
-  await page.getByText('This file changed on disk').waitFor({ timeout: 5000 });
+  await page.getByText('This file changed on disk').waitFor();
   check('external edit to a dirty tab shows a conflict', true);
   await shot('05-conflict');
   await page.getByRole('button', { name: 'Keep my edits' }).click();

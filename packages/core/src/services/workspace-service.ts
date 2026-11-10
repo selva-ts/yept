@@ -113,6 +113,16 @@ export class WorkspaceService {
     return this.reload(true);
   }
 
+  /**
+   * Runs a change to the workspace after any reload in progress, and holds later reloads until it is done. A reload
+   * rebuilds the collection maps, so a change made halfway through would not find its collection or request.
+   */
+  exclusive<T>(fn: () => Promise<T>): Promise<T> {
+    const task = this.reloading.then(fn);
+    this.reloading = task.then(() => {}, () => {});
+    return task;
+  }
+
   private reload(all: boolean): Promise<void> {
     const task = this.reloading.then(() => this.reloadNow(all));
     this.reloading = task.catch(() => {});

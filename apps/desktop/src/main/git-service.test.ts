@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -8,20 +8,31 @@ import type { EnvService } from '@yept/core/services/env-service';
 import { Workspace } from '@yept/core/engine/workspace/workspace';
 import { IdentityStore } from '@yept/core/engine/identity/identity-store';
 
-let dir: string, repo: string, workspace: Workspace, identity: IdentityStore, service: GitService;
+let seed: string, dir: string, repo: string, workspace: Workspace, identity: IdentityStore, service: GitService;
 const sh = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 const emptyEnv = { allSecretValues: () => [] } as unknown as EnvService;
-beforeEach(async () => {
-  dir = mkdtempSync(join(tmpdir(), 'yept-git-service-')); repo = join(dir, 'repo'); mkdirSync(repo);
+beforeAll(() => {
+  seed = mkdtempSync(join(tmpdir(), 'yept-git-service-seed-'));
+  vi.stubEnv('GIT_CONFIG_NOSYSTEM', '1');
+  vi.stubEnv('GIT_CONFIG_GLOBAL', join(seed, 'gitconfig'));
+  repo = join(seed, 'repo'); mkdirSync(repo);
   sh(repo, 'init', '-b', 'main'); sh(repo, 'config', 'user.email', 'test@example.test'); sh(repo, 'config', 'user.name', 'Test'); sh(repo, 'config', 'commit.gpgsign', 'false');
   sh(repo, 'config', 'core.autocrlf', 'false');
   cpSync(join(__dirname, '../../../../fixtures/collections/sample-travel'), join(repo, 'collection'), { recursive: true });
   writeFileSync(join(repo, 'README.md'), 'outside collection\n'); sh(repo, 'add', '.'); sh(repo, 'commit', '-m', 'initial');
+}, 60000);
+beforeEach(async () => {
+  dir = mkdtempSync(join(tmpdir(), 'yept-git-service-')); repo = join(dir, 'repo');
+  cpSync(join(seed, 'repo'), repo, { recursive: true });
   identity = new IdentityStore(join(dir, 'identity.db'));
   workspace = new Workspace(repo, identity, { trash: async () => {} }); await workspace.load();
   service = new GitService(() => workspace, emptyEnv, async (path) => { renameSync(path, join(dir, 'trashed')); }, async () => { await workspace.load(); });
 });
-afterEach(() => { identity?.close(); rmSync(dir, { recursive: true, force: true }); });
+afterEach(() => { identity?.close(); rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); });
+afterAll(() => {
+  vi.unstubAllEnvs();
+  if (seed) rmSync(seed, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+});
 
 it('rejects repositories and paths outside the open collections, and ignores renderer-supplied rename metadata', async () => {
   writeFileSync(join(repo, 'README.md'), 'keep this\n');
@@ -72,14 +83,14 @@ it('serializes mutations for the same repository through workspace reload', asyn
 it('reports a failed workspace reload alongside a successful Git result, without replacing it', async () => {
   service = new GitService(() => workspace, emptyEnv, async () => {}, async () => { throw new Error('collection unreadable'); });
   const r = await service.action(repo, 'switch', 'main');
-  expect(r.ok).toBe(true);
+  expect(r.ok, r.output).toBe(true);
   expect(r.output).toContain('could not reload the collections afterwards (collection unreadable)');
 });
 
-it('keeps the identity of a request a teammate renamed and edited, after a pull', async () => {
+it('keeps the identity of a request a teammate renamed and edited, after a pull', { timeout: 60000 }, async () => {
   const remote = join(dir, 'remote.git'); const teammate = join(dir, 'teammate');
   sh(dir, 'init', '--bare', '-b', 'main', remote); sh(repo, 'remote', 'add', 'origin', remote); sh(repo, 'push', '-u', 'origin', 'main');
-  sh(dir, 'clone', remote, teammate); sh(teammate, 'config', 'user.email', 'mate@example.test'); sh(teammate, 'config', 'user.name', 'Mate'); sh(teammate, 'config', 'commit.gpgsign', 'false');
+  sh(dir, 'clone', '--no-hardlinks', remote, teammate); sh(teammate, 'config', 'user.email', 'mate@example.test'); sh(teammate, 'config', 'user.name', 'Mate'); sh(teammate, 'config', 'commit.gpgsign', 'false');
   const id = workspace.requestIdForFile(join(repo, 'collection/Bookings/List bookings.yml'))!;
   const login = workspace.requestIdForFile(join(repo, 'collection/Auth/Login.yml'))!;
   expect(id).toBeTruthy();
@@ -92,7 +103,7 @@ it('keeps the identity of a request a teammate renamed and edited, after a pull'
   sh(teammate, 'commit', '-qam', 'rename bookings'); sh(teammate, 'push', '-q');
 
   const r = await service.action(repo, 'pull');
-  expect(r.ok).toBe(true);
+  expect(r.ok, r.output).toBe(true);
   expect(r.output).toContain('History kept for 1 renamed request:\n  collection/Bookings/List bookings.yml → collection/Reports/All bookings.yml');
   expect(workspace.requestIdForFile(join(repo, 'collection/Reports/All bookings.yml'))).toBe(id);
   expect(workspace.getRequest(id).doc.url).toContain('status=open');

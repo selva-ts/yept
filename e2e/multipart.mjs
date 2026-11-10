@@ -71,7 +71,7 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
-const app = await electron.launch({ args: [root], env: { ...process.env, YEPT_USER_DATA: userData } });
+const app = await electron.launch({ args: [root], env: { ...process.env, YEPT_USER_DATA: userData }, timeout: 60000 });
 const page = await app.firstWindow();
 page.on('pageerror', (e) => check('no renderer errors', false, e.message));
 await page.setViewportSize({ width: 1400, height: 900 });
@@ -81,14 +81,7 @@ const stubOpen = (files) => app.evaluate(({ dialog }, f) => { dialog.showOpenDia
 const responseText = async () => (await page.locator('.response .monaco-editor .view-lines').innerText()).replaceAll(String.fromCharCode(160), ' ');
 const rows = () => page.locator('.multipart tbody tr');
 
-async function send() {
-  await page.keyboard.press('Control+Enter');
-  await page.getByRole('button', { name: 'Cancel', exact: true }).waitFor({ state: 'hidden', timeout: 10000 });
-  await page.locator('.response .status').filter({ hasNotText: '…' }).first().waitFor({ timeout: 10000 });
-}
-
 try {
-  await page.getByText('Sample Travel').waitFor({ timeout: 15000 });
   await page.getByRole('button', { name: 'Open Sample Travel' }).click();
   await page.getByRole('button', { name: '+ New request' }).click();
   await page.getByRole('dialog').locator('input').fill('Upload documents');
@@ -111,17 +104,18 @@ try {
   // 2. The picker: inside the collection -> relative path; outside -> this computer only.
   await stubOpen([inside, outside]);
   await rows().nth(1).getByRole('button', { name: 'Choose files…' }).click();
-  await rows().nth(1).getByLabel('File path').waitFor({ timeout: 5000 });
+  await rows().nth(1).getByLabel('File path').waitFor();
+  await rows().nth(1).locator('.mp-file.local', { hasText: 'passport-scan.png' }).waitFor();
   check('a file inside the collection is shown relative to it', (await rows().nth(1).getByLabel('File path').inputValue()) === 'files/boarding-pass.txt');
   check('a file outside the collection is marked this computer only', await rows().nth(1).locator('.mp-file.local', { hasText: 'passport-scan.png' }).getByText('this computer only').isVisible());
   await shot('01-body');
 
   // 3. Send: both files arrive intact with their names and types.
-  await send();
-  await page.locator('.response .status', { hasText: '200' }).waitFor({ timeout: 5000 });
+  await page.keyboard.press('Control+Enter');
+  await page.locator('.response .status', { hasText: '200' }).waitFor();
   // The response editor loads after the status line, so wait for its text rather than reading it at once.
-  const showsParts = await page.locator('.response .monaco-editor .view-lines', { hasText: 'traveller' }).waitFor({ timeout: 5000 }).then(() => true, () => false);
-  check('the response shows the parts the server received', showsParts && (await responseText()).includes('"traveller"'));
+  await page.locator('.response .monaco-editor .view-lines', { hasText: 'traveller' }).waitFor();
+  check('the response shows the parts the server received', (await responseText()).includes('"traveller"'));
   const echo = await (await fetch(`${base}/upload/last`)).json();
   const parts = echo.parts ?? [];
   check('Content-Length matches the body sent', echo.contentLength === echo.received, `${echo.contentLength} vs ${echo.received}`);
@@ -153,7 +147,7 @@ try {
 
   // 6. A missing file: nothing is sent, and the message names the field and the path.
   await fs.rename(inside, `${inside}.moved`);
-  await send();
+  await page.keyboard.press('Control+Enter');
   const error = await page.locator('.response .error-card').innerText();
   check('a missing file stops the send, naming the field and the path', error.includes('Multipart field "documents": files/boarding-pass.txt was not found') && error.includes('Nothing was sent'), error.split('\n').join(' | '));
   await shot('03-missing-file');
@@ -178,7 +172,7 @@ try {
   check('an unsupported body type is shown as kept unchanged', await page.getByText("This body type (Binary file) isn't supported yet and is kept unchanged").isVisible());
   check('no body type is selected for it', !(await page.getByLabel('No body', { exact: true }).isChecked()));
   await shot('05-unsupported-body');
-  await send();
+  await page.keyboard.press('Control+Enter');
   const unsupported = await page.locator('.response .error-card').innerText();
   check('sending it stops with an explanation', unsupported.includes(`Body type "file" isn't supported`) && unsupported.includes('Nothing was sent'), unsupported.split('\n').join(' | '));
   await page.getByLabel('URL', { exact: true }).fill('https://api.example.test/scan/v2');
@@ -200,7 +194,8 @@ try {
   await app.close().catch(() => {});
   server.closeAllConnections();
   server.close();
-  await fs.rm(tmp, { recursive: true, force: true }).catch(() => {});
+  // A file still held open by the closing app must not fail a run whose checks passed.
+  await fs.rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch((e) => console.log(`warning: temp folder not removed: ${e.message}`));
 }
 
 const failed = results.filter((r) => !r.ok);

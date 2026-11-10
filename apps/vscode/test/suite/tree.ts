@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import * as vscode from 'vscode';
 import type { TestApi } from '../../src/extension';
 import type { TreeItem } from '../../src/collections';
@@ -295,8 +295,8 @@ export async function run(): Promise<void> {
       }
     }],
     ['opens external collections through a cancellable workspace flow', async () => {
-      const external = vscode.Uri.file(join(process.env.YEPT_TEST_EMPTY!, 'external-collection')).fsPath;
-      await mkdir(external);
+      const external = vscode.Uri.file(await mkdtemp(join(dirname(process.env.YEPT_TEST_EMPTY!), 'external-collection-'))).fsPath;
+      const folderIndex = () => vscode.workspace.workspaceFolders?.findIndex((f) => f.uri.fsPath === external) ?? -1;
       await writeFile(join(external, 'bruno.json'), JSON.stringify({ version: '1', name: 'External synthetic', type: 'collection' }));
       const win = vscode.window as any;
       const originals = { showOpenDialog: win.showOpenDialog, showInformationMessage: win.showInformationMessage };
@@ -304,7 +304,7 @@ export async function run(): Promise<void> {
         win.showOpenDialog = async () => [vscode.Uri.file(external)];
         win.showInformationMessage = async () => undefined;
         await vscode.commands.executeCommand('yept.openCollection');
-        assert.ok(!vscode.workspace.workspaceFolders?.some((f) => f.uri.fsPath === external));
+        assert.equal(folderIndex(), -1);
         win.showInformationMessage = async () => 'Add to Workspace';
         await vscode.commands.executeCommand('yept.openCollection');
         await until(() => !!api.collections.workspace(external), 'opened external collection');
@@ -312,11 +312,11 @@ export async function run(): Promise<void> {
         assert.ok(api.collections.snapshots().find((s) => s.root === external)?.collections.some((c) => c.name === 'External synthetic' && c.readOnly));
       } finally {
         Object.assign(win, originals);
-        const index = vscode.workspace.workspaceFolders?.findIndex((f) => f.uri.fsPath === external) ?? -1;
+        const index = folderIndex();
         if (index >= 0) vscode.workspace.updateWorkspaceFolders(index, 1);
-        await until(() => !api.collections.workspace(external), 'external collection removal');
+        await until(() => folderIndex() < 0 && !api.collections.workspace(external), 'external collection removal');
         await api.collections.settled();
-        await rm(external, { recursive: true, force: true });
+        await rm(external, { recursive: true, force: true, maxRetries: 8, retryDelay: 200 });
       }
     }]
   ];

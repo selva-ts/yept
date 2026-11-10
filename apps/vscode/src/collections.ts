@@ -197,19 +197,25 @@ export class Collections implements vscode.TreeDataProvider<TreeItem>, vscode.Di
   snapshots(): WorkspaceSnapshot[] { return [...this.roots.values()].map((root) => root.snapshot); }
   settled(): Promise<void> { return this.serial; }
   workspace(root: string): Workspace | undefined { return [...this.roots.values()].find((r) => r.workspace.root === root)?.workspace; }
-  /** Windows cannot rename a directory while chokidar holds its watcher handles. */
+  /** Windows cannot rename a directory while chokidar holds its watcher handles. Serialize with watcher reloads. */
   async withWatcherPaused<T>(rootPath: string, change: () => Promise<T>): Promise<T> {
-    const root = [...this.roots.values()].find((entry) => entry.workspace.root === rootPath);
-    if (!root) throw new Error('The selected workspace folder has closed.');
-    await root.watcher?.close();
-    root.watcher = undefined;
-    root.watched = '';
-    try { return await change(); }
-    finally {
-      root.snapshot = root.workspace.snapshot();
-      await this.watchCollections(root);
-      this.filesChanged.fire(rootPath);
-    }
+    let result!: T;
+    await this.enqueue(async () => {
+      const root = [...this.roots.values()].find((entry) => entry.workspace.root === rootPath);
+      if (this.disposed || !root) throw new Error('The selected workspace folder has closed.');
+      await root.watcher?.close();
+      root.watcher = undefined;
+      root.watched = '';
+      root.loading = true;
+      try { result = await change(); }
+      finally {
+        root.loading = false;
+        root.snapshot = root.workspace.snapshot();
+        await this.watchCollections(root);
+        this.filesChanged.fire(rootPath);
+      }
+    });
+    return result;
   }
   rootForRequest(id: string): string | undefined { return requestRoots(this.snapshots()).get(id); }
   name(root: string): string | undefined { return [...this.roots.values()].find((r) => r.workspace.root === root)?.folder.name; }

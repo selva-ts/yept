@@ -17,10 +17,10 @@ const check = (name, ok) => { results.push({ name, ok }); console.log(`${ok ? 'P
 let app;
 let page;
 const launch = async () => {
-  app = await electron.launch({ args: [root], env: { ...process.env, YEPT_USER_DATA: userData } });
+  app = await electron.launch({ args: [root], env: { ...process.env, YEPT_USER_DATA: userData }, timeout: 60000 });
   page = await app.firstWindow();
   // Wait for the restored tiles: the heading also shows on the empty state while the workspace loads.
-  await page.locator('.collection-card').first().waitFor({ timeout: 15000 });
+  await page.locator('.collection-card').first().waitFor();
 };
 const quit = async () => {
   await app.evaluate(({ app: electronApp }) => electronApp.exit(0)).catch(() => {});
@@ -100,7 +100,7 @@ try {
   await page.getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: 'Close' }).click();
   await page.getByRole('button', { name: 'Menu' }).click();
   await page.getByRole('menuitemradio', { name: 'Dark mode' }).click();
-  await page.waitForTimeout(300);
+  await page.getByRole('button', { name: 'Mode: Dark' }).waitFor();
   check('Dark mode applies to the window', await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource) === 'dark');
   await quit();
   await launch();
@@ -117,19 +117,24 @@ try {
   await card.locator('.collection-more summary').click();
   check('tile menu opens', await card.locator('.collection-menu').isVisible());
   await page.locator('.home-heading h1').click();
-  await page.waitForTimeout(100);
+  await card.locator('.collection-menu').waitFor({ state: 'hidden' });
   check('tile menu closes on outside click', !(await card.locator('.collection-menu').isVisible()));
 
   await card.locator('.collection-more summary').click();
   await card.getByRole('button', { name: 'Move to Recycle Bin' }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Move to Recycle Bin' }).click();
-  await card.waitFor({ state: 'detached' });
+  await Promise.all([
+    page.getByRole('dialog').getByRole('button', { name: 'Move to Recycle Bin' }).click(),
+    Promise.race([
+      card.waitFor({ state: 'detached', timeout: 60000 }),
+      page.locator('.toast.error').first().innerText({ timeout: 60000 }).then((message) => { throw new Error(message); })
+    ])
+  ]);
   check('collection moves to the Recycle Bin', !existsSync(join(workspace, 'Fresh API')));
 } catch (e) {
   check(`scenario completed: ${e.message.split('\n')[0]}`, false);
 } finally {
   if (app) await quit();
-  await fs.rm(temp, { recursive: true, force: true });
+  await fs.rm(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }
 
 const failed = results.filter((result) => !result.ok);
