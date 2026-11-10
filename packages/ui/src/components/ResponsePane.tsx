@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { LARGE_BODY_CHARS, type HistorySummary, type RunResult, type TestResult } from '@shared/model';
+import { queryJsonPath, suggestVariableName, variableText } from '@shared/jsonpath';
+import { MEDIA_PREVIEW_MAX_BYTES, mediaKind, responseFileName } from '@shared/response-file';
 import { errorMessage, formatBytes, formatMs, yept } from '../api';
 import FormatWorker from '../format.worker?worker';
 import { formatMarkup, markupKind, previewDocument, type MarkupKind } from '../markup';
@@ -7,10 +9,12 @@ import { useStore, type Tab } from '../store';
 import { CodeEditor } from './CodeEditor';
 import { confirm } from './Dialogs';
 import { ResponseCookies } from './ResponseCookies';
+import { HistoryCompare, JsonFilterBar, MediaPreview, SetVariableDialog } from './ResponseTools';
 
 type View = 'body' | 'headers' | 'cookies' | 'tests' | 'scripts' | 'timeline';
 type BodyMode = 'pretty' | 'raw' | 'preview';
-type Shown = { text: string; language: 'json' | 'xml' | 'html' | 'plaintext'; formatting?: boolean };
+/** data: the parsed body, for a JSON body in the Pretty view (the filter runs on it). */
+type Shown = { text: string; language: 'json' | 'xml' | 'html' | 'plaintext'; formatting?: boolean; data?: unknown };
 // HTML/XML up to this size formats in a few tens of milliseconds, about as long as starting the worker.
 const INLINE_FORMAT_LIMIT = 128 * 1024;
 
@@ -29,9 +33,9 @@ function formatSafely(text: string, kind: MarkupKind): string {
   }
 }
 
-function prettyJson(text: string): string | null {
+function parseJson(text: string): { data: unknown } | null {
   try {
-    return JSON.stringify(JSON.parse(text), null, 2);
+    return { data: JSON.parse(text) };
   } catch {
     return null; // not JSON after all (or a truncated stored body)
   }
@@ -46,10 +50,11 @@ function useBodyText(r: RunResult | null, kind: MarkupKind | null, mode: 'pretty
   const body = r && r.outcome === 'http' && !r.body.binary ? r.body : null;
   // A preview (only the start of the body) is never formatted: the rest is missing.
   const tooLarge = !!body && (!!body.preview || (body.text.length > LARGE_BODY_CHARS && !force));
-  const json = useMemo(
-    () => (body && mode === 'pretty' && !tooLarge && (/json/i.test(body.contentType) || /^\s*[[{]/.test(body.text)) ? prettyJson(body.text) : null),
+  const parsed = useMemo(
+    () => (body && mode === 'pretty' && !tooLarge && (/json/i.test(body.contentType) || /^\s*[[{]/.test(body.text)) ? parseJson(body.text) : null),
     [body, mode, tooLarge]
   );
+  const json = useMemo(() => (parsed ? JSON.stringify(parsed.data, null, 2) : null), [parsed]);
   const inline = useMemo(() => (body && kind && mode === 'pretty' && json === null && body.text.length <= INLINE_FORMAT_LIMIT ? formatSafely(body.text, kind) : null), [body, kind, mode, json]);
   const wanted = mode === 'pretty' && !tooLarge && json === null && inline === null && kind !== null && formatted?.source !== r;
 
@@ -68,16 +73,25 @@ function useBodyText(r: RunResult | null, kind: MarkupKind | null, mode: 'pretty
 
   if (!body) return null;
   if (mode === 'raw' || tooLarge) return { text: body.text, language: 'plaintext' };
-  if (json !== null) return { text: json, language: 'json' };
+  if (json !== null) return { text: json, language: 'json', data: parsed!.data };
   if (!kind) return { text: body.text, language: 'plaintext' };
   if (inline !== null) return { text: inline, language: kind };
   return formatted?.source === r ? { text: formatted.text, language: kind } : { text: body.text, language: kind, formatting: true };
 }
 
+/** Content-Disposition's file name, else the URL's last segment, else the request name. */
 function suggestedName(tab: Tab, r: RunResult): string {
-  const ct = r.body.contentType;
-  const ext = /json/i.test(ct) ? 'json' : /xml/i.test(ct) ? 'xml' : /html/i.test(ct) ? 'html' : /text/i.test(ct) ? 'txt' : 'bin';
-  return `${tab.draft.name.replace(/[<>:"/\\|?*]/g, '-')}.${ext}`;
+  return responseFileName(r.headers, r.request.url, r.body.contentType, tab.draft.name);
+}
+
+/** A selected piece of JSON as a variable value: a quoted string loses its quotes, anything else stays as selected. */
+function selectedValue(text: string): string {
+  const t = text.trim();
+  try {
+    return variableText(JSON.parse(t));
+  } catch {
+    return t;
+  }
 }
 
 const when = (iso: string): string => {
@@ -124,11 +138,28 @@ export function ResponsePane({ tab, onOpenInEditor }: { tab: Tab; onOpenInEditor
   const viewing = tab.viewing;
   const r = viewing?.result ?? run?.result ?? null;
   const kind = useMemo(() => (r && r.outcome === 'http' && !r.body.binary ? markupKind(r.body.contentType, r.body.text) : null), [r]);
-  // Preview stays chosen while the tab keeps sending; a response that isn't HTML shows Pretty meanwhile.
-  const mode: BodyMode = bodyMode === 'preview' && kind !== 'html' ? 'pretty' : bodyMode;
+  // Images and PDFs from the received bytes. A binary one has nothing else to show, so it always shows the preview.
+  const media = r && r.outcome === 'http' ? mediaKind(r.body.contentType) : null;
+  // Preview stays chosen while the tab keeps sending; a response that can't be previewed shows Pretty meanwhile.
+  // A PDF, or a binary image, opens in Preview; Pretty or Raw chosen for it applies to that response only.
+  const [mediaMode, setMediaMode] = useState<{ runId: string; mode: BodyMode } | null>(null);
+  const previewFirst = !!r && (media === 'pdf' || (media === 'image' && r.body.binary));
+  const mode: BodyMode = previewFirst ? (mediaMode?.runId === r.runId && !r.body.binary ? mediaMode.mode : 'preview') : bodyMode === 'preview' && kind !== 'html' && !media ? 'pretty' : bodyMode;
   const shown = useBodyText(r, kind, mode === 'preview' ? 'raw' : mode, forceLarge);
   const partial = !!r?.body.preview;
   const large = !!r && (partial || (r.body.text.length > LARGE_BODY_CHARS && !forceLarge));
+  const [filter, setFilter] = useState('');
+  // The filter bar opens from the Filter button and stays while a filter is set, so it takes no room otherwise.
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterable = mode === 'pretty' && shown?.data !== undefined;
+  const deferredFilter = useDeferredValue(filter);
+  const data = shown?.data;
+  const filtered = useMemo(() => (data !== undefined && deferredFilter.trim() ? queryJsonPath(data, deferredFilter) : null), [data, deferredFilter]);
+  const filteredText = useMemo(() => (filtered?.ok ? JSON.stringify(filtered.matches.map((m) => m.value), null, 2) : null), [filtered]);
+  const [selection, setSelection] = useState('');
+  const [variable, setVariable] = useState<{ value: string; name: string } | null>(null);
+  // Picking runs to compare: null when not comparing, then up to two run ids.
+  const [compare, setCompare] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (tab.history === null) void loadHistory(tab.id);
@@ -142,7 +173,8 @@ export function ResponsePane({ tab, onOpenInEditor }: { tab: Tab; onOpenInEditor
 
   const copy = async (): Promise<void> => {
     if (!shown) return;
-    await yept.clipboard.write(shown.text);
+    // What is on screen: the filter's matches while a filter is applied.
+    await yept.clipboard.write(mode === 'pretty' && filteredText !== null ? filteredText : shown.text);
     toast('Response body copied');
   };
   const saveToFile = async (): Promise<void> => {
@@ -154,6 +186,20 @@ export function ResponsePane({ tab, onOpenInEditor }: { tab: Tab; onOpenInEditor
       toast(errorMessage(e), 'error');
     }
   };
+  /** From the editor's selection (or text passed from its context menu), else the filter's one match. */
+  const setAsVariable = (text?: string): void => {
+    const picked = (text ?? selection).trim();
+    const single = filtered?.ok && filtered.matches.length === 1 ? filtered.matches[0] : null;
+    if (picked) setVariable({ value: selectedValue(picked), name: single && variableText(single.value) === selectedValue(picked) ? suggestVariableName(single.path) : 'value' });
+    else if (single) setVariable({ value: variableText(single.value), name: suggestVariableName(single.path) });
+    else toast(filtered?.ok && filtered.matches.length > 1 ? 'The filter matches more than one value. Narrow it to one, or select a value in the body.' : 'Select a value in the body, or filter the body down to one value.', 'error');
+  };
+  const pickRun = (runId: string): void =>
+    setCompare((c) => {
+      const current = c ?? [];
+      if (current.includes(runId)) return current.filter((id) => id !== runId);
+      return [...current, runId].slice(-2);
+    });
   const statusClass = r ? (r.outcome === 'http' ? `s${String(r.status)[0]}` : r.outcome === 'cancelled' ? 'neutral' : 'fail') : 'neutral';
 
   const content = !r ? (
@@ -208,8 +254,13 @@ export function ResponsePane({ tab, onOpenInEditor }: { tab: Tab; onOpenInEditor
         ))}
         {view === 'body' && !r.body.binary && (
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }}>
-            {(kind === 'html' ? (['pretty', 'raw', 'preview'] as const) : (['pretty', 'raw'] as const)).map((m) => (
-              <button key={m} className="btn ghost small" aria-pressed={mode === m} onClick={() => setBodyMode(m)} style={mode === m ? { background: 'var(--sel)' } : undefined}>
+            {filterable && (
+              <button className={`btn ghost small ${filterOpen || filter ? 'active-toggle' : ''}`} aria-pressed={filterOpen || !!filter} onClick={() => { if (filterOpen || filter) { setFilter(''); setFilterOpen(false); } else setFilterOpen(true); }} title="Filter the JSON body with JSONPath">
+                Filter
+              </button>
+            )}
+            {(kind === 'html' || media ? (['pretty', 'raw', 'preview'] as const) : (['pretty', 'raw'] as const)).map((m) => (
+              <button key={m} className="btn ghost small" aria-pressed={mode === m} onClick={() => (previewFirst ? setMediaMode({ runId: r.runId, mode: m }) : setBodyMode(m))} style={mode === m ? { background: 'var(--sel)' } : undefined}>
                 {m[0].toUpperCase() + m.slice(1)}
               </button>
             ))}
@@ -227,6 +278,16 @@ export function ResponsePane({ tab, onOpenInEditor }: { tab: Tab; onOpenInEditor
           )}
           {viewing?.summary.bodyOmitted ? (
             <div className="empty">The body wasn't kept in history (Settings → body size limit is 0).</div>
+          ) : media && mode === 'preview' && r.sizeBytes > 0 ? (
+            r.body.truncated ? (
+              <div className="empty">Only part of this body was {viewing ? 'kept in history' : 'received'}, so it can't be previewed. Save to file keeps what there is.</div>
+            ) : r.sizeBytes > MEDIA_PREVIEW_MAX_BYTES ? (
+              <div className="empty">
+                {formatBytes(r.sizeBytes)} is more than the {formatBytes(MEDIA_PREVIEW_MAX_BYTES)} preview limit · use <b>&nbsp;Save to file…&nbsp;</b> to keep it.
+              </div>
+            ) : (
+              <MediaPreview key={r.runId} result={r} />
+            )
           ) : r.body.binary ? (
             <div className="empty">
               Binary response · {formatBytes(r.sizeBytes)} · use <b>&nbsp;Save to file…&nbsp;</b> to keep it.
@@ -253,11 +314,20 @@ export function ResponsePane({ tab, onOpenInEditor }: { tab: Tab; onOpenInEditor
                 </div>
               )}
               {mode === 'pretty' && shown?.formatting && <div className="truncated-note">Formatting…</div>}
+              {filterable && (filterOpen || !!filter) && (
+                <JsonFilterBar filter={filter} onFilter={setFilter} result={filtered} onSetVariable={() => setAsVariable()} onClose={() => { setFilter(''); setFilterOpen(false); }} />
+              )}
               {mode === 'preview' && !large ? (
                 <HtmlPreview html={r.body.text} />
               ) : (
                 <div className="monaco-host">
-                  <CodeEditor value={shown!.text} language={shown!.language} readOnly />
+                  <CodeEditor
+                    value={filteredText ?? shown!.text}
+                    language={shown!.language}
+                    readOnly
+                    onSelectionText={setSelection}
+                    onSetAsVariable={(text) => setAsVariable(text)}
+                  />
                 </div>
               )}
             </>
@@ -367,9 +437,12 @@ export function ResponsePane({ tab, onOpenInEditor }: { tab: Tab; onOpenInEditor
         </div>
       )}
       <div className="response-body">
-        {tab.historyOpen && <HistoryPanel tab={tab} onOpen={(runId) => void viewRun(tab.id, runId)} />}
-        <div className="response-main">{content}</div>
+        {tab.historyOpen && <HistoryPanel tab={tab} onOpen={(runId) => void viewRun(tab.id, runId)} compare={compare} onCompare={setCompare} onPick={pickRun} />}
+        <div className="response-main">
+          {tab.historyOpen && compare?.length === 2 ? <HistoryCompare runIds={[compare[0], compare[1]]} onClose={() => setCompare(null)} /> : content}
+        </div>
       </div>
+      {variable && <SetVariableDialog collectionId={tab.collectionId} value={variable.value} initialName={variable.name} onClose={() => setVariable(null)} />}
     </section>
   );
 }
@@ -388,7 +461,8 @@ function HtmlPreview({ html }: { html: string }): React.JSX.Element {
   );
 }
 
-function HistoryPanel({ tab, onOpen }: { tab: Tab; onOpen: (runId: string) => void }): React.JSX.Element {
+/** compare: null, or the runs picked so far for comparing (two show the comparison). */
+function HistoryPanel({ tab, onOpen, compare, onCompare, onPick }: { tab: Tab; onOpen: (runId: string) => void; compare: string[] | null; onCompare: (c: string[] | null) => void; onPick: (runId: string) => void }): React.JSX.Element {
   const { loadHistory, toast, backToLatest } = useStore();
   const items = tab.history ?? [];
   const current = tab.viewing?.summary.runId ?? tab.run?.runId;
@@ -413,6 +487,11 @@ function HistoryPanel({ tab, onOpen }: { tab: Tab; onOpen: (runId: string) => vo
         <b>History</b>
         <span className="mute small">this machine</span>
         <span className="spacer" />
+        {items.length > 1 && (
+          <button className={`btn ghost small ${compare ? 'active-toggle' : ''}`} aria-pressed={!!compare} onClick={() => onCompare(compare ? null : [])} title="Pick two runs to see their differences">
+            Compare
+          </button>
+        )}
         {items.length > 0 && (
           <>
             <button className="btn ghost small" onClick={() => void exportAll()} title="Export to JSON">
@@ -425,8 +504,14 @@ function HistoryPanel({ tab, onOpen }: { tab: Tab; onOpen: (runId: string) => vo
         )}
       </div>
       {items.length === 0 && <p className="mute small" style={{ padding: '0 10px' }}>No runs yet. Every send is kept here (redacted), up to the limit in Settings.</p>}
+      {compare && <p className="mute small compare-hint">{compare.length === 0 ? 'Pick two runs to compare.' : compare.length === 1 ? 'Pick one more run.' : 'Pick another run to change the pair.'}</p>}
       {items.map((h: HistorySummary) => (
-        <button key={h.runId} className={`history-item ${h.runId === current ? 'active' : ''}`} onClick={() => onOpen(h.runId)}>
+        <button
+          key={h.runId}
+          className={`history-item ${compare ? (compare.includes(h.runId) ? 'picked' : '') : h.runId === current ? 'active' : ''}`}
+          aria-pressed={compare ? compare.includes(h.runId) : undefined}
+          onClick={() => (compare ? onPick(h.runId) : onOpen(h.runId))}
+        >
           <span className={`hstatus ${h.outcome === 'http' ? `s${String(h.status)[0]}` : 'fail'}`}>{h.outcome === 'http' ? h.status : OUTCOME_TITLES[h.outcome as Exclude<RunResult['outcome'], 'http'>]}</span>
           <span className="htime">{when(h.startedAt)}</span>
           <span className="hmeta mute">

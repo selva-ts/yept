@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatMarkup, markupKind, PREVIEW_CSP, previewDocument } from './markup';
+import { formatMarkup, markupKind, PREVIEW_CSP, previewDocument, mediaDocument } from './markup';
 
 describe('markupKind', () => {
   it('uses the content type first', () => {
@@ -79,4 +79,18 @@ describe('previewDocument', () => {
     expect(doc.startsWith(`<!DOCTYPE html><meta http-equiv="Content-Security-Policy" content="${PREVIEW_CSP}"><html>`)).toBe(true);
     expect(previewDocument('<p>x</p>').startsWith('<meta http-equiv="Content-Security-Policy"')).toBe(true);
   });
+});
+
+it('builds the image and PDF preview from data: images only, under the preview policy', () => {
+  const png = 'data:image/png;base64,iVBORw0KGgo=';
+  const doc = mediaDocument([
+    { src: png, alt: 'Page "1" <b>' },
+    { src: 'http://127.0.0.1:4010/media/image.png', alt: 'remote' },
+    { src: 'data:text/html;base64,PHNjcmlwdD4=', alt: 'html' },
+    { src: 'data:image/png;base64,abc" onerror="x', alt: 'broken out' }
+  ]);
+  expect(doc.indexOf(`content="${PREVIEW_CSP}"`)).toBeGreaterThan(0);
+  expect(doc).toContain(`<img src="${png}" alt="Page &quot;1&quot; &lt;b&gt;">`);
+  expect(doc.match(/<img /g)).toHaveLength(1);
+  expect(doc).not.toMatch(/127\.0\.0\.1|text\/html|onerror|<script/);
 });

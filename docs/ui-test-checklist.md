@@ -110,6 +110,9 @@ For the installed build, run `dist\Yept-Setup-0.9.0.exe` instead of `npm run dev
 | F10 | Raw response with `Set-Cookie`; **Copy**, then *Show cookie values* and **Copy** | First copy has the values masked, the second has them; **…with secrets** on the request includes the token (last request of a redirect chain only) | |
 | F11 | Import a Postman collection whose pre-request script logs in with `pm.sendRequest`; send a request | The login runs; Network shows it as a **script** row; *Show the run that sent it* and **Scripts sent** move between them; the client secret and token are masked in Console and Network | |
 | F12 | A pre-request script calling `bru.sendRequest` on a slow endpoint; press **Cancel**, then send and wait | Cancel stops at once (Cancelled); otherwise the script stops after 5 s saying it was waiting for `bru.sendRequest`; the script row shows Cancelled | |
+| F13 | Network → a request with a bearer token → **Copy as ▾**, keyboard only (arrows, Enter, Esc) | Menu opens above the button when the drawer is low, focus starts on *Include secrets and cookies*; each language copies with `••••••`; ticked, the copy has the token and the tick is gone next time | |
+| F14 | Paste each **Copy as** language (with secrets) into its tool: Visual Studio or `dotnet run app.cs`, PowerShell 7, Node.js (`.mjs`, axios installed), Python with `requests`, against the fixture server | Each sends the same method, URL, headers and body as Yept; the response prints | |
+| F15 | Same in the VS Code extension's **Yept** Dev Tools view | Menu fits inside the panel; copies land on the clipboard; *with secrets* works for a request sent from a panel | |
 
 ## G. Source control (use a disposable collections repository)
 
@@ -160,6 +163,7 @@ For the installed build, run `dist\Yept-Setup-0.9.0.exe` instead of `npm run dev
 | Commit the request and open it on a second computer (or a second Windows user) | The outside file shows *No file chosen on this computer*; the collection file is found | |
 | Open the same collection in Bruno after saving | Bruno shows the multipart fields and the collection-relative file; the request sends there | |
 | Copy as cURL (with secrets), run it in Git Bash | curl sends the same fields and files | |
+| Copy as ▾ → PowerShell (with secrets), run it in PowerShell 7; then in Windows PowerShell 5.1 | 7 sends the fields and files; 5.1 stops at `-Form`, as the comment at the top says | |
 | Import a Postman collection with a file field | The import preview says the exporting computer's file path was left out; the field is a file field with no file | |
 
 ## J. HTML and XML responses
@@ -188,6 +192,29 @@ For the installed build, run `dist\Yept-Setup-0.9.0.exe` instead of `npm run dev
 | Edit a request without saving, then run its folder | The runner says one request has unsaved edits; the saved version is sent | |
 | After a run: Dev tools Network and each request's history | One row and one history entry per request; script requests linked to the request that sent them | |
 | Narrow window, dark mode, each theme, keyboard only (Tab, Space on the checkbox, Esc) | The table wraps without overlapping; result colours readable; Esc closes | |
+| **Choose CSV or JSON…** with a CSV saved from Excel as *CSV UTF-8* with names like München or சென்னை | Rows and variables counted; the values arrive intact (check in Dev tools) | |
+| A CSV with a bad row (more values than the header, an unclosed quote), a JSON object instead of an array, a file in ANSI encoding | A message names the line or the problem; nothing runs | |
+| Data file chosen, then **Remove**; switch to another collection | Iterations go back to the repeat count; another collection doesn't keep the file | |
+| Iterations 200 with a delay of 0 against a fast endpoint | The runner and the app stay responsive; passed iterations stay closed; the footer counts up | |
+| Delay 5000, **Cancel run** during the wait | The run ends at once; the rest show *Not run* | |
+| **JUnit XML…** and **HTML report…** after a run with secrets (basic auth, a secret in a URL) | Save dialog on top of the app (VS Code: its own save dialog); the files show «redacted» and «secret:…», never the values; the HTML opens in a browser offline, in light and dark mode | |
+| The same in the VS Code extension's runner panel | Data file, iterations, delay and both exports work as on the desktop | |
+
+## L. Response tools
+
+| Check | Expected | Result |
+|---|---|---|
+| A large JSON response (a few MB under the 2 MB format limit, e.g. a long list); type `$..id` quickly into **Filter** | The window keeps up while typing; the match count updates; over 10,000 matches says "First 10,000 matches" | |
+| Select a value in the Pretty body with the mouse (a quoted string, a number, an object); **Set as variable…**, and the editor's right-click **Set as variable…** | The dialog shows the value without the quotes; an object as compact JSON | |
+| **Set as variable…** with nothing selected and a filter matching several values | A message asks to narrow the filter or select a value; no dialog | |
+| **Set as variable…** with no environment selected | The dialog says to choose an environment first; **Set variable** is disabled | |
+| Store a token as a **Local secret**, then open **Environments** | The name is marked secret, its value masked; the environment file in Git shows only the name | |
+| **Save to file…** on a real download (zip, PNG, PDF), then open the saved file | It opens in its usual app; the suggested name matches the server's file name | |
+| A PNG, JPEG, GIF, SVG and a multi-page PDF, light and dark mode, each theme | Drawn on a neutral background; transparent images show a checkerboard; the PDF note gives the page count; app colours unchanged around it | |
+| A PDF with links and a form | Pages drawn as pictures; clicking does nothing; no window opens | |
+| History → **Compare** → pick two runs, then a third; **Close comparison** | The pair changes to the last two picked; changed rows highlighted; Headers and Body diffs side by side; Close returns to the response | |
+| Compare in a narrow window and keyboard only (Tab, Space on the runs) | The table wraps without overlap; the diff stays usable | |
+| VS Code extension: Filter, Set as variable, Save to file (VS Code's save dialog), image and PDF preview, Compare | The same as on the desktop | |
 
 ## Reporting
 

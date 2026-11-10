@@ -1,4 +1,5 @@
-import { join } from 'node:path';
+import { writeFile } from 'node:fs/promises';
+import { basename, join } from 'node:path';
 import { HandlerRegistry } from '@yept/core/shared/handler-registry';
 import type { AppSettings, RunResult } from '@yept/core/shared/model';
 import type { AppHost } from '@yept/core/services/host';
@@ -7,6 +8,7 @@ import { SettingsService } from '@yept/core/services/settings-service';
 import { CookieService } from '@yept/core/services/cookie-service';
 import { RunService } from '@yept/core/services/run-service';
 import { CollectionRunService } from '@yept/core/services/collection-run-service';
+import { cleanRunnerOptions } from '@yept/core/shared/collection-run';
 import { ImportService } from '@yept/core/services/import-service';
 import type { DevToolsRunEvent } from '@yept/core/shared/ipc';
 import { CookieStore } from '@yept/core/engine/cookies/cookie-store';
@@ -14,6 +16,7 @@ import { LocalStore } from '@yept/core/engine/env/local-store';
 import { HistoryStore } from '@yept/core/engine/history/store';
 import { cookieKey, cookieView, environment, nullableText, requestDoc, text, tlsSettings } from './validation';
 import { devToolsResult, previewResult } from './body-document';
+import { mediaBytes } from '@yept/core/services/media-bytes';
 import type { Workspace } from '@yept/core/engine/workspace/workspace';
 
 /** The settings VS Code owns (`yept.*`), read at each use so a change applies without a reload. */
@@ -86,7 +89,7 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
   const cookies = new CookieService(ws, env, settings, host, stores.cookies);
   const runs = new RunService(env, settings, cookies, host, stores.history, { scriptsBlocked: hooks.scriptsBlocked });
   // Runner progress goes to every page; results are cut to what Dev Tools shows.
-  const runner = new CollectionRunService(ws, runs, (e) => host.emit('runner:event', e.type === 'step-end' && e.result ? { ...e, result: devToolsResult(e.result) } : e));
+  const runner = new CollectionRunService(ws, runs, (e) => host.emit('runner:event', e.type === 'step-end' && e.result ? { ...e, result: devToolsResult(e.result) } : e), host);
   // Import and export run from the extension's commands, not from a page.
   const importer = new ImportService(ws, env, host);
   const handlers = new HandlerRegistry();
@@ -117,7 +120,12 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
 
   // Results go to the page with large bodies cut to a preview; the run ids of text bodies are kept for "Open in editor".
   const shownBodies = new Map<string, ShownBody>();
+  // Every run the page was shown, text or binary, for "Save to file" and the image and PDF preview.
+  const shownRuns = new Set<string>();
   const shown = <T extends RunResult>(runId: string, result: T, requestName: string): T => {
+    shownRuns.delete(runId);
+    shownRuns.add(runId);
+    while (shownRuns.size > SHOWN_BODIES) shownRuns.delete(shownRuns.keys().next().value!);
     if (!result.body.binary) {
       shownBodies.delete(runId);
       shownBodies.set(runId, { runId, contentType: result.body.contentType, requestName });
@@ -206,6 +214,12 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
     hooks.onSave?.();
     return changed(list);
   });
+  handle('env:set-runtime', 4, (id, name, variable, value) => {
+    text(variable);
+    text(value);
+    env.setRuntime(id, existing(id, name), variable, value);
+    hooks.onEnvChange?.();
+  });
   handle('env:clear-runtime', 2, (id, name) => { env.clearRuntime(id, existing(id, name)); });
   handle('env:pick-ca-file', 0, async () => {
     const result = await host.openDialog({ title: 'Choose a CA certificate (PEM)', properties: ['openFile'], filters: [{ name: 'Certificates', extensions: ['pem', 'crt', 'cer'] }] });
@@ -238,9 +252,9 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
     if (!active.has(id)) throw new Error('Run not active');
     runs.cancel(id);
   });
-  handle('runs:curl-with-secrets', 1, (id) => {
+  handle('runs:curl-with-secrets', [1, 2], (id, language) => {
     text(id);
-    return runs.curlWithSecrets(id);
+    return runs.curlWithSecrets(id, language ?? 'curl');
   });
   handle('runs:raw-with-secrets', 1, (id) => {
     text(id);
@@ -259,6 +273,22 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
     if (!hooks.openBody) throw new Error('Opening a body in an editor is not available here');
     await hooks.openBody(body);
   });
+  // A run the page was shown, or a stored run of a request in this folder; its body stays here until saved or previewed.
+  const shownBody = (id: unknown): Buffer | undefined => {
+    text(id);
+    if (!shownRuns.has(id)) history(id);
+    return runs.body(id);
+  };
+  handle('runs:save-body', 2, async (id, suggestedName) => {
+    text(suggestedName);
+    const body = shownBody(id);
+    if (!body) throw new Error('This response is no longer available to save. Send the request again.');
+    const result = await host.saveDialog({ title: 'Save response body', defaultPath: basename(suggestedName.replace(/\\/g, '/')) || 'response.bin' });
+    if (result.canceled || !result.filePath) return null;
+    await writeFile(result.filePath, body);
+    return result.filePath;
+  });
+  handle('runs:body-bytes', 1, (id) => mediaBytes(shownBody(id)));
   handle('oauth2:token', 3, async (id, doc, action) => {
     request(id);
     requestDoc(doc);
@@ -271,7 +301,7 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
     text(runnerId);
     text(nodeId);
     try {
-      return await runner.start(runnerId, nodeId, { environment: typeof options?.environment === 'string' ? options.environment : null, stopOnFailure: !!options?.stopOnFailure });
+      return await runner.start(runnerId, nodeId, cleanRunnerOptions(options));
     } finally {
       // Each request is in history, and extracted tokens, script variables and cookies may have changed.
       hooks.onHistoryChange?.();
@@ -281,6 +311,13 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
   handle('runner:cancel', 1, (runnerId) => {
     text(runnerId);
     runner.cancel(runnerId);
+  });
+  // A data file is read on the extension's side, from a file chosen in VS Code's open dialog; the page gets its summary.
+  handle('runner:pick-data-file', 0, () => runner.pickDataFile());
+  handle('runner:export-report', 2, (runnerId, format) => {
+    text(runnerId);
+    if (format !== 'junit' && format !== 'html') throw new Error('Invalid report format');
+    return runner.exportReport(runnerId, format);
   });
 
   handle('cookies:list', 1, (id) => cookies.view(collection(id)));

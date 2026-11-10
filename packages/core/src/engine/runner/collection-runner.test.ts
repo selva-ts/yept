@@ -145,6 +145,58 @@ describe('runSequence', () => {
     });
     expect(r.steps.map((s) => s.status)).toEqual(['cancelled', 'skipped']);
   });
+
+  it('runs the plan once per iteration, telling the step which iteration it is in', async () => {
+    const sent: string[] = [];
+    const r = await runSequence([item('A'), item('B')], {
+      stopOnFailure: false, iterations: 3, newRunId: ids(),
+      runStep: async (p, runId, iteration) => { sent.push(`${iteration}${p.name}`); return result({ runId }); }
+    });
+    expect(sent).toEqual(['1A', '1B', '2A', '2B', '3A', '3B']);
+    expect(r.iterations).toBe(3);
+    expect(r.steps.map((s) => `${s.iteration}${s.name}:${s.runId}`)).toEqual(['1A:run-1', '1B:run-2', '2A:run-3', '2B:run-4', '3A:run-5', '3B:run-6']);
+    expect(r.summary.total).toBe(6);
+  });
+
+  it('stopping after a failure skips the rest of every iteration', async () => {
+    const r = await runSequence([item('A'), item('B'), item('C')], {
+      stopOnFailure: true, iterations: 3, newRunId: ids(),
+      runStep: (p, runId, iteration) => (iteration === 2 && p.name === 'B' ? failing(p, runId) : Promise.resolve(result({ runId })))
+    });
+    expect(r.ended).toBe('stopped');
+    expect(r.steps.map((s) => s.status)).toEqual(['no-tests', 'no-tests', 'no-tests', 'no-tests', 'failed', 'skipped', 'skipped', 'skipped', 'skipped']);
+    expect(r.steps[5].reason).toBe('Not run: stopped after "B" (iteration 2) failed');
+  });
+
+  it('waits between requests, within and between iterations, but not before the first', async () => {
+    const times: number[] = [];
+    const t0 = Date.now();
+    await runSequence([item('A'), item('B')], {
+      stopOnFailure: false, iterations: 2, delayMs: 40, newRunId: ids(),
+      runStep: async (p, runId) => { times.push(Date.now() - t0); return result({ runId }); }
+    });
+    expect(times[0]).toBeLessThan(35);
+    // Timers can fire a little early on Windows.
+    for (let i = 1; i < times.length; i++) expect(times[i] - times[i - 1]).toBeGreaterThanOrEqual(35);
+  });
+
+  it('cancel during a wait stops at once and sends nothing more', async () => {
+    const ac = new AbortController();
+    const sent: string[] = [];
+    const t0 = Date.now();
+    const r = await runSequence([item('A'), item('B')], {
+      stopOnFailure: false, iterations: 2, delayMs: 10_000, signal: ac.signal, newRunId: ids(),
+      runStep: async (p, runId) => {
+        sent.push(p.name);
+        setTimeout(() => ac.abort(), 20);
+        return result({ runId });
+      }
+    });
+    expect(Date.now() - t0).toBeLessThan(2000);
+    expect(sent).toEqual(['A']);
+    expect(r.ended).toBe('cancelled');
+    expect(r.steps.map((s) => s.status)).toEqual(['no-tests', 'skipped', 'skipped', 'skipped']);
+  });
 });
 
 describe('runSequence through the request pipeline', () => {

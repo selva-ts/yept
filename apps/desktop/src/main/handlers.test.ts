@@ -65,3 +65,7 @@ it('rejects an unavailable response before opening a save dialog', async () => {
 it('refuses a pasted command that is not curl before touching the workspace', async () => {
   await expect(application.handlers.invoke('requests:create-from-curl', 'collection:none', 'Pasted', 'wget https://api.example.test/')).rejects.toThrow('This is not a curl command');
 });
+
+it('rejects preview bytes for a response that is not kept', async () => {
+  await expect(application.handlers.invoke('runs:body-bytes', 'missing-run')).rejects.toThrow('no longer available');
+});

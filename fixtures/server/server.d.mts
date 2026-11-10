@@ -3,6 +3,8 @@ import type { Server } from 'node:http';
 export const CLIENT_ID: string;
 export const CLIENT_SECRET: string;
 export function createFixtureServer(): Server;
+export function fixturePng(): Buffer;
+export function fixturePdf(): Buffer;
 export const DIGEST_USER: string;
 export const DIGEST_PASSWORD: string;
 export const NTLM_USER: string;

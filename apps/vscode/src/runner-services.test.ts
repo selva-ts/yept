@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { randomBytes } from 'node:crypto';
-import { createHost } from './host';
+import { createHost, type HostOptions } from './host';
 import { keyCipher } from './cipher';
 import { createLocalStores, createRequestServices, type ServiceHooks } from './handlers';
 import { IdentityStore } from '@yept/core/engine/identity/identity-store';
@@ -34,9 +34,9 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });
 
-async function open(hooks: ServiceHooks = {}) {
+async function open(hooks: ServiceHooks = {}, dialogs: Pick<HostOptions, 'openDialog' | 'saveDialog'> = {}) {
   const emitted: RunnerEvent[] = [];
-  const host = await createHost(join(dir, 'storage'), dir, '0.9.0', {}, () => {}, (channel, event) => { if (channel === 'runner:event') emitted.push(event as RunnerEvent); }, { cipher: keyCipher(randomBytes(32)) });
+  const host = await createHost(join(dir, 'storage'), dir, '0.9.0', {}, () => {}, (channel, event) => { if (channel === 'runner:event') emitted.push(event as RunnerEvent); }, { cipher: keyCipher(randomBytes(32)), ...dialogs });
   // The bundled worker isn't built for unit tests; the engine's own worker runs the scripts.
   host.sandboxWorkerPath = resolve('packages/core/src/engine/sandbox/worker.mjs');
   const identity = new IdentityStore(join(host.userDataPath(), 'identity.db'));
@@ -70,6 +70,29 @@ it('runs a collection through its channel, sends progress as runner events and t
   await expect(services.handlers.invoke('runner:cancel', 'r', 'extra')).rejects.toThrow('count');
 });
 
+it('runs with a data file chosen in the open dialog, and saves reports through the save dialog', async () => {
+  const csv = join(dir, 'rows.csv');
+  await writeFile(csv, 'note\nfirst\nsecond\n');
+  let saveTo = join(dir, 'results.xml');
+  const { services, collectionId } = await open({}, {
+    openDialog: async () => ({ canceled: false, filePaths: [csv] }),
+    saveDialog: async () => ({ canceled: false, filePath: saveTo })
+  });
+  expect(await services.handlers.invoke('runner:pick-data-file')).toMatchObject({ name: 'rows.csv', format: 'csv', rows: 2, columns: ['note'] });
+  const result = await services.handlers.invoke('runner:start', 'runner-data', collectionId, { environment: 'local', stopOnFailure: false, dataFile: csv, delayMs: 5 }) as RunnerResult;
+  expect(result.iterations).toBe(2);
+  expect(result.steps.map((s) => `${s.iteration} ${s.name} ${s.status}`)).toEqual(['1 Login passed', '1 List bookings passed', '2 Login passed', '2 List bookings passed']);
+  expect(await services.handlers.invoke('runner:export-report', 'runner-data', 'junit')).toBe(saveTo);
+  const xml = await readFile(saveTo, 'utf8');
+  expect(xml).toContain('<testsuite name="Auth / Login (iteration 2)"');
+  expect(xml).not.toContain('sample-secret');
+  saveTo = join(dir, 'report.html');
+  await services.handlers.invoke('runner:export-report', 'runner-data', 'html');
+  expect(await readFile(saveTo, 'utf8')).toMatch(/^<!doctype html>/);
+  await expect(services.handlers.invoke('runner:export-report', 'runner-data', 'pdf')).rejects.toThrow('Invalid report format');
+  await expect(services.handlers.invoke('runner:export-report', 'runner-data')).rejects.toThrow('count');
+});
+
 it('cuts large bodies in runner events to what Dev Tools shows', async () => {
   const { services, ws, collectionId, emitted } = await open();
   const login = [...ws.liveRequestIds()].find((r) => ws.getRequest(r).doc.name === 'Login')!;
@@ -96,6 +119,13 @@ it('tells Dev Tools when a panel send starts and ends, with the active environme
   // Copies with secrets are kept for runs of this session.
   expect(await services.handlers.invoke('runs:curl-with-secrets', runId)).toContain(Buffer.from('sample-client:sample-secret').toString('base64'));
   expect(await services.handlers.invoke('runs:raw-with-secrets', runId)).toMatch(/^POST \/auth\/token/);
+  // The same, as code in another language.
+  const basic = Buffer.from('sample-client:sample-secret').toString('base64');
+  const python = await services.handlers.invoke('runs:curl-with-secrets', runId, 'python') as string;
+  expect(python.startsWith('import requests')).toBe(true);
+  expect(python).toContain(basic);
+  expect(await services.handlers.invoke('runs:curl-with-secrets', runId, 'csharp')).toContain(basic);
+  await expect(services.handlers.invoke('runs:curl-with-secrets', runId, 'ruby')).rejects.toThrow('Unknown language');
   await expect(services.handlers.invoke('runs:curl-with-secrets', 'unknown')).rejects.toThrow('last 50 requests');
 });
 

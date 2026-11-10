@@ -5,13 +5,14 @@ import { splitPickedFiles } from '@yept/core/engine/runner/multipart';
 import { WorkspaceService } from '@yept/core/services/workspace-service';
 import { RunService } from '@yept/core/services/run-service';
 import { CollectionRunService } from '@yept/core/services/collection-run-service';
-import type { RunnerOptions } from '@yept/core/shared/collection-run';
+import { cleanRunnerOptions } from '@yept/core/shared/collection-run';
 import { parseCurl, requestFromCurl } from '@yept/core/shared/curl';
 import { EnvService } from '@yept/core/services/env-service';
 import { SettingsService } from '@yept/core/services/settings-service';
 import { GitService } from './git-service';
 import { ImportService } from '@yept/core/services/import-service';
 import { CookieService } from '@yept/core/services/cookie-service';
+import { mediaBytes } from '@yept/core/services/media-bytes';
 import type { AppMetrics, MutationResult } from '@yept/core/shared/ipc';
 import { APPEARANCE_KEYS, type Appearance, type AppSettings, type CookieView, type Environment, type GitFile, type RequestDoc, type SettingsDoc, type TlsSettings } from '@yept/core/shared/model';
 
@@ -24,7 +25,7 @@ export function createHandlers(host: AppHost): { handlers: HandlerRegistry; clos
   const appSettings = new SettingsService(host);
   const cookies = new CookieService(ws, env, appSettings, host);
   const runs = new RunService(env, appSettings, cookies, host);
-  const runner = new CollectionRunService(ws, runs, (e) => host.emit('runner:event', e));
+  const runner = new CollectionRunService(ws, runs, (e) => host.emit('runner:event', e), host);
   const gitService = new GitService(ws, env, (path) => host.trash(path), () => workspaces.refreshAfterGit(), (fn) => workspaces.duringGit(fn));
   const importer = new ImportService(ws, env, host);
   const mutate = async (fn: () => Promise<string | void>): Promise<MutationResult> => {
@@ -77,6 +78,7 @@ export function createHandlers(host: AppHost): { handlers: HandlerRegistry; clos
   handle('env:reveal-secret', (c: string, e: string, n: string) => env.revealSecret(c, e, n));
   handle('env:set-tls', (c: string, e: string, tls: TlsSettings) => env.setTls(c, e, tls));
   handle('env:store-as-secret', (c: string, e: string, n: string, v: string) => env.storeAsSecret(c, e, n, v));
+  handle('env:set-runtime', (c: string, e: string, n: string, v: string) => env.setRuntime(c, e, n, v));
   handle('env:clear-runtime', (c: string, e: string) => env.clearRuntime(c, e));
   handle('env:preview', async (requestId: string, doc: RequestDoc) => env.requestPreview(await ws().requestContext(requestId), doc));
   handle('env:pick-ca-file', async () => {
@@ -90,8 +92,10 @@ export function createHandlers(host: AppHost): { handlers: HandlerRegistry; clos
     return runs.start(runId, { requestId, requestName: doc.name, requestPath: path, ctx: await ws().requestContext(requestId) }, doc);
   });
   handle('runs:cookie-value', (runId: string, index: number) => runs.cookieValue(runId, index));
-  handle('runner:start', (runnerId: string, nodeId: string, options: RunnerOptions) => runner.start(runnerId, nodeId, { environment: typeof options?.environment === 'string' ? options.environment : null, stopOnFailure: !!options?.stopOnFailure }));
+  handle('runner:start', (runnerId: string, nodeId: string, options: unknown) => runner.start(runnerId, nodeId, cleanRunnerOptions(options)));
   handle('runner:cancel', (runnerId: string) => runner.cancel(runnerId));
+  handle('runner:pick-data-file', () => runner.pickDataFile());
+  handle('runner:export-report', (runnerId: string, format: unknown) => runner.exportReport(runnerId, format === 'html' ? 'html' : 'junit'));
   handle('oauth2:token', async (requestId: string, doc: RequestDoc, action: 'status' | 'fetch' | 'forget') => runs.oauth2Token(await ws().requestContext(requestId), doc, action));
 
   handle('history:list', (requestId: string) => runs.history.list(requestId));
@@ -156,8 +160,9 @@ export function createHandlers(host: AppHost): { handlers: HandlerRegistry; clos
     await fs.writeFile(r.filePath, body);
     return r.filePath;
   });
+  handle('runs:body-bytes', (runId: string) => mediaBytes(runs.body(runId)));
 
-  handle('runs:curl-with-secrets', (runId: string) => runs.curlWithSecrets(runId));
+  handle('runs:curl-with-secrets', (runId: string, language?: unknown) => runs.curlWithSecrets(runId, language ?? 'curl'));
   handle('runs:raw-with-secrets', (runId: string) => runs.rawWithSecrets(runId));
 
   type CookieKey = Pick<CookieView, 'domain' | 'path' | 'name'>;

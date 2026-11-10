@@ -1,5 +1,6 @@
 // Typed contract between renderer and main. Keep it narrow: the renderer never touches Node, files or the network.
-import type { RunnerEvent, RunnerOptions, RunnerResult } from './collection-run';
+import type { DataFileInfo, RunnerEvent, RunnerOptions, RunnerResult } from './collection-run';
+import type { SnippetLanguage } from './snippets';
 import type { Appearance, AppSettings, AuthConfig, CookieView, Environment, OAuth2TokenStatus, EnvironmentView, GitFile, HistoryEntry, HistorySummary, ImportSecretFinding, LeakFinding, OrphanedHistory, RequestDoc, ResolvedVar, RunResult, SettingsDoc, TlsSettings, WorkspaceSnapshot } from './model';
 
 export interface SelfTestResult {
@@ -194,6 +195,8 @@ export interface YeptApi {
     setTls: (collectionId: string, env: string, tls: TlsSettings) => Promise<EnvironmentList>;
     /** Declares `name` as a secret in the environment file (if needed) and stores `value` locally. */
     storeAsSecret: (collectionId: string, env: string, name: string, value: string) => Promise<EnvironmentList>;
+    /** Sets a runtime variable of an environment for this session (not saved anywhere). */
+    setRuntime: (collectionId: string, env: string, name: string, value: string) => Promise<void>;
     /** Forgets runtime and session variables (e.g. extracted tokens that aren't secrets) for an environment. */
     clearRuntime: (collectionId: string, env: string) => Promise<void>;
     preview: (requestId: string, doc: RequestDoc) => Promise<RequestPreview>;
@@ -254,8 +257,13 @@ export interface YeptApi {
     cancel: (runId: string) => Promise<void>;
     /** Shows a save dialog and writes the raw response bytes. Resolves the saved path, or null if cancelled. */
     saveBody: (runId: string, suggestedName: string) => Promise<string | null>;
-    /** The request as a cURL command with secrets and cookies included. Only for recent runs of this session. */
-    curlWithSecrets: (runId: string) => Promise<string>;
+    /**
+     * The response body as base64, for the image and PDF preview: the bytes as received for recent runs, else the stored
+     * history body. Refused above MEDIA_PREVIEW_MAX_BYTES.
+     */
+    bodyBytes: (runId: string) => Promise<string>;
+    /** The request as a cURL command (or as code in another language) with secrets and cookies included. Only for recent runs of this session. */
+    curlWithSecrets: (runId: string, language?: SnippetLanguage) => Promise<string>;
     /** The raw HTTP request head of the last request sent, with secrets and cookies. Only for recent runs of this session. */
     rawWithSecrets: (runId: string) => Promise<string>;
     /** Explicit reveal of one recorded cookie value, in memory for the last 50 sends only. */
@@ -268,6 +276,10 @@ export interface YeptApi {
     start: (runnerId: string, nodeId: string, options: RunnerOptions) => Promise<RunnerResult>;
     cancel: (runnerId: string) => Promise<void>;
     onEvent: (cb: (e: RunnerEvent) => void) => () => void;
+    /** Asks for a CSV or JSON data file and checks it. Null if cancelled; a file that can't be used rejects with why. */
+    pickDataFile: () => Promise<DataFileInfo | null>;
+    /** Saves a finished run as JUnit XML or a self-contained HTML page, secrets redacted. Resolves the path, or null if cancelled. */
+    exportReport: (runnerId: string, format: 'junit' | 'html') => Promise<string | null>;
   };
 
   oauth2: {
