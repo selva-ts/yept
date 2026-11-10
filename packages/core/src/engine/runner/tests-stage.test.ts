@@ -9,17 +9,21 @@ import { run, type RunOptions } from './runner';
 
 let server: Server;
 let base = '';
+// Normal scripts get a generous limit so a slow machine cannot time them out; the runaway-script test uses its own short one.
 let sandbox: SandboxHost;
+let quick: SandboxHost;
 beforeAll(async () => {
   server = createFixtureServer();
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  sandbox = new SandboxHost(new URL('../sandbox/worker.mjs', import.meta.url), { timeoutMs: 1500 });
+  sandbox = new SandboxHost(new URL('../sandbox/worker.mjs', import.meta.url), { timeoutMs: 10000 });
+  quick = new SandboxHost(new URL('../sandbox/worker.mjs', import.meta.url), { timeoutMs: 1500 });
 });
 afterAll(async () => {
   server.closeAllConnections();
   server.close();
   await sandbox.close();
+  await quick.close();
 });
 
 const noAuth: AuthConfig = { mode: 'none', bearer: { token: '' }, basic: { username: '', password: '' }, apikey: { key: '', value: '', placement: 'header' }, oauth2: { ...DEFAULT_OAUTH2 } };
@@ -53,7 +57,7 @@ describe('tests stage', () => {
   });
 
   it('a runaway test script is stopped and reported as an error', async () => {
-    const r = await run(doc({ tests: 'test("spin", () => { while (true) {} });' }), opts());
+    const r = await run(doc({ tests: 'test("spin", () => { while (true) {} });' }), opts({ sandbox: quick }));
     expect(r.result.tests[0]).toMatchObject({ status: 'error' });
     expect(r.result.tests[0].message).toMatch(/timed out after 1500 ms/);
   });

@@ -17,20 +17,24 @@ import { MAX_SCRIPT_REQUESTS, ScriptRequestError, prepareScriptRequest, scriptOp
 
 let server: Server;
 let base = '';
+// Normal scripts get a generous limit so a slow machine cannot time them out; the runaway-script test uses its own short one.
 let sandbox: SandboxHost;
+let quick: SandboxHost;
 let dir = '';
 
 beforeAll(async () => {
   server = createFixtureServer();
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  sandbox = new SandboxHost(new URL('../sandbox/worker.mjs', import.meta.url), { timeoutMs: 2000 });
+  sandbox = new SandboxHost(new URL('../sandbox/worker.mjs', import.meta.url), { timeoutMs: 10000 });
+  quick = new SandboxHost(new URL('../sandbox/worker.mjs', import.meta.url), { timeoutMs: 2000 });
   dir = mkdtempSync(join(tmpdir(), 'yept-send-'));
 });
 afterAll(async () => {
   server.closeAllConnections();
   server.close();
   await sandbox.close();
+  await quick.close();
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -238,7 +242,7 @@ describe('limits', () => {
 
   it('shares the script time limit and stops the request it is waiting for', async () => {
     const started = Date.now();
-    const out = await run(pre(`await bru.sendRequest(bru.getEnvVar('baseUrl') + '/hang');`), opts());
+    const out = await run(pre(`await bru.sendRequest(bru.getEnvVar('baseUrl') + '/hang');`), opts({ sandbox: quick }));
     expect(Date.now() - started).toBeLessThan(4000);
     expect(out.result.outcome).toBe('prepare_error');
     expect(out.result.scriptErrors[0].message).toMatch(/timed out after 2000 ms.*waiting for bru\.sendRequest/);

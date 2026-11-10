@@ -6,6 +6,8 @@ directories:
   buildResources: build
 files:
   - out/**
+  # CI writes its logs to out/ci while packaging; they must not go into the app.
+  - "!out/ci/**"
   - package.json
   - "!**/*.{map,md,ts}"
 asar: true

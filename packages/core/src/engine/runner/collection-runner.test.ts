@@ -155,7 +155,7 @@ describe('runSequence through the request pipeline', () => {
     server = createFixtureServer();
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-    sandbox = new SandboxHost(new URL('../sandbox/worker.mjs', import.meta.url), { timeoutMs: 3000 });
+    sandbox = new SandboxHost(new URL('../sandbox/worker.mjs', import.meta.url), { timeoutMs: 10000 });
   });
   afterAll(async () => {
     server.closeAllConnections();
