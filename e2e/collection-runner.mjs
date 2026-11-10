@@ -1,7 +1,8 @@
 // End-to-end: the collection runner. A whole collection runs in sidebar order with an environment chosen in the dialog
 // (login → list → create → read → delete), with a results list and counts that keep request errors apart from failed
 // tests; each request lands in Dev tools and history; a script's bru.sendRequest is not a step; stop on failure,
-// Cancel, unsaved edits and the entry points (sidebar menus, collection overview, Home).
+// Cancel, unsaved edits and the entry points (sidebar menus, collection overview, Home). Then a CSV data file: one
+// iteration per row, with a delay between requests, grouped results, and JUnit and HTML reports.
 // Usage: npm run build && node e2e/collection-runner.mjs   (screenshots go to e2e/out/, which is git-ignored)
 import { _electron as electron } from 'playwright';
 import { promises as fs } from 'node:fs';
@@ -62,6 +63,15 @@ await write('Slow', { name: 'After hang', seq: 2, url: '{{baseUrl}}/echo', auth:
 const server = createFixtureServer();
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
+
+// A collection for data files: the environment's name is overridden by each row; its test fails without a row.
+const dataDir = join(wsDir, 'data-runs');
+await fs.mkdir(join(dataDir, 'environments'), { recursive: true });
+await fs.writeFile(join(dataDir, 'opencollection.yml'), 'opencollection: 1.0.0\n\ninfo:\n  name: Data Runs\n');
+await fs.writeFile(join(dataDir, 'environments', 'local.yml'), `name: local\nvariables:\n  - name: baseUrl\n    value: ${base}\n  - name: name\n    value: from-env\n  - name: city\n    value: nowhere\n`);
+await fs.writeFile(join(dataDir, 'Greet.yml'), requestFile({ name: 'Greet', seq: 1, url: '{{baseUrl}}/echo?name={{name}}&city={{city}}', auth: false, tests: 'test("uses the row", function () { expect(res.body.query.name).to.not.equal("from-env"); });' }));
+const csv = join(tmp, 'people.csv');
+await fs.writeFile(csv, '\uFEFFname,city\r\nAsha,Chennai\r\nRavi,"Pune, MH"\r\n"Meera ""M""",Delhi\r\n');
 
 const results = [];
 const check = (name, ok, detail = '') => {
@@ -210,6 +220,69 @@ try {
     await page.getByRole('button', { name: 'Run collection…' }).click();
   });
   await shot('04-dark');
+  // 7. A CSV data file: three iterations, a delay between requests, results grouped by iteration, and reports.
+  await page.emulateMedia({ colorScheme: 'light' });
+  await app.evaluate(({ dialog }, f) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [f] }); }, csv);
+  await dlg.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Collections', exact: true }).click();
+  const dataCard = page.locator('.collection-card', { hasText: 'Data Runs' });
+  await dataCard.locator('summary').click();
+  await dataCard.getByRole('button', { name: 'Run collection' }).click();
+  await dlg.waitFor();
+  await dlg.getByLabel('Environment').selectOption('local');
+  await dlg.getByRole('button', { name: 'Choose CSV or JSON…' }).click();
+  const dataBox = dlg.getByRole('group', { name: 'Data file' });
+  await dataBox.getByText('people.csv').waitFor({ timeout: 5000 });
+  check('the data file shows its rows and variables', (await dataBox.innerText()).replace(/\s+/g, ' ').includes('3 rows · 2 variables'), await dataBox.innerText());
+  const iterationsBox = dlg.getByLabel('Iterations');
+  check('the iterations follow the file', (await iterationsBox.inputValue()) === '3' && (await iterationsBox.isDisabled()));
+  await dlg.getByLabel('Delay between requests (ms)').fill('400');
+  await dlg.getByLabel('Stop after the first failure').uncheck();
+  const t0 = Date.now();
+  await dlg.getByRole('button', { name: 'Run 1 request × 3' }).click();
+  await finished();
+  const took = Date.now() - t0;
+  check('the delay is kept between requests', took >= 800, `${took} ms`);
+  const dataSum = await summary();
+  check('the summary shows the data file, iterations and delay', dataSum.includes('data file people.csv · 3 iterations · 400 ms between requests') && /Requests: 3 passed/.test(dataSum) && /Tests: 3 passed 0 failed/.test(dataSum), dataSum);
+  const iterationRows = dlg.locator('tbody tr.runner-iteration');
+  const iterationTexts = (await iterationRows.allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+  check('results are grouped by iteration, passed ones closed', iterationTexts.length === 3 && iterationTexts.every((t, i) => t.includes(`Iteration ${i + 1}`) && t.includes('1 passed')) && (await steps.count()) === 0, iterationTexts.join(' | '));
+  await iterationRows.filter({ hasText: 'Iteration 2' }).click();
+  check('an iteration opens to show its requests', (await steps.count()) === 1 && (await stepTexts())[0].includes('Passed'), (await stepTexts()).join(' | '));
+  await steps.first().click();
+  check('the row values were sent', (await dlg.locator('.runner-details').innerText()).includes('uses the row'));
+  await shot('05-data-file');
+
+  // Reports: JUnit XML with a suite per request and iteration, and a self-contained HTML page.
+  const junitPath = join(tmp, 'results.xml');
+  const htmlPath = join(tmp, 'report.html');
+  const stubSave = (f) => app.evaluate(({ dialog }, file) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: file }); }, f);
+  await stubSave(junitPath);
+  await dlg.getByRole('button', { name: 'JUnit XML…' }).click();
+  await page.locator('.toast', { hasText: 'Saved the JUnit report' }).waitFor({ timeout: 5000 });
+  const xml = await fs.readFile(junitPath, 'utf8');
+  const parsed = await page.evaluate((text) => {
+    const doc = new DOMParser().parseFromString(text, 'application/xml');
+    if (doc.querySelector('parsererror')) return { error: doc.querySelector('parsererror').textContent };
+    return { suites: [...doc.querySelectorAll('testsuite')].map((x) => x.getAttribute('name')), cases: doc.querySelectorAll('testcase').length, failures: doc.documentElement.getAttribute('failures') };
+  }, xml);
+  check('the JUnit report is valid XML', !parsed.error, parsed.error);
+  check('the JUnit report has a suite per request and iteration', JSON.stringify(parsed.suites) === JSON.stringify(['Greet (iteration 1)', 'Greet (iteration 2)', 'Greet (iteration 3)']) && parsed.cases === 3 && parsed.failures === '0', JSON.stringify(parsed));
+  check('the JUnit report has the values sent', xml.includes('name=Meera%20%22M%22&amp;city=Delhi'), xml.slice(0, 400));
+  await stubSave(htmlPath);
+  await dlg.getByRole('button', { name: 'HTML report…' }).click();
+  await page.locator('.toast', { hasText: 'Saved the HTML report' }).waitFor({ timeout: 5000 });
+  const report = await fs.readFile(htmlPath, 'utf8');
+  check('the HTML report is self-contained', report.startsWith('<!doctype html>') && report.includes('Iteration 3') && !/<(script|link|img)\b/i.test(report));
+
+  // Without the file, the environment's value is back: the row values were for their iteration only.
+  await dataBox.getByRole('button', { name: 'Remove' }).click();
+  await dlg.getByLabel('Delay between requests (ms)').fill('0');
+  await dlg.getByRole('button', { name: 'Run again' }).click();
+  await finished();
+  check('row values do not stay after the run', (await stepTexts())[0]?.includes('Failed'), (await stepTexts()).join(' | '));
+
 } catch (e) {
   check('scenario completed', false, e.message.split('\n')[0]);
   await shot('99-failure').catch(() => {});

@@ -25,6 +25,8 @@ export interface TestCounts {
 }
 
 export interface RunnerStep extends RunnerPlanItem {
+  /** Which pass over the plan this step belongs to, from 1. Always 1 for a run without iterations. */
+  iteration: number;
   /** The request's run id: its history entry and Dev tools row. '' until it starts. */
   runId: string;
   status: StepStatus;
@@ -40,8 +42,48 @@ export interface RunnerStep extends RunnerPlanItem {
 export interface RunnerOptions {
   /** Environment name, or null for none. Captured when the run starts. */
   environment: string | null;
-  /** Stop after the first step that failed or errored; the rest are skipped. */
+  /** Stop after the first step that failed or errored; the rest are skipped, in every iteration. */
   stopOnFailure: boolean;
+  /**
+   * A CSV or JSON data file picked in the runner on this machine: one iteration per row, the row's values as runtime
+   * variables for that iteration. Never written to collection files.
+   */
+  dataFile?: string | null;
+  /** How many times to run the plan without a data file. 1 when left out. */
+  iterations?: number;
+  /** Wait between requests, in ms, within and between iterations. */
+  delayMs?: number;
+}
+
+/** A data file the runner has read: what the dialog shows about it. */
+export interface DataFileInfo {
+  /** Full path on this machine. */
+  path: string;
+  /** File name only. */
+  name: string;
+  format: 'csv' | 'json';
+  rows: number;
+  /** Variable names, in file order. */
+  columns: string[];
+}
+
+/** Limits on one run, so a typo can't start a run that never ends. */
+export const MAX_ITERATIONS = 1000;
+export const MAX_DELAY_MS = 60_000;
+
+const wholeNumber = (v: unknown, min: number, max: number, fallback: number): number =>
+  typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : fallback;
+
+/** Runner options as they arrive from a page, checked and clamped to the limits above. */
+export function cleanRunnerOptions(o: unknown): RunnerOptions {
+  const r = (o && typeof o === 'object' ? o : {}) as Record<string, unknown>;
+  return {
+    environment: typeof r.environment === 'string' ? r.environment : null,
+    stopOnFailure: !!r.stopOnFailure,
+    dataFile: typeof r.dataFile === 'string' && r.dataFile ? r.dataFile : null,
+    iterations: wholeNumber(r.iterations, 1, MAX_ITERATIONS, 1),
+    delayMs: wholeNumber(r.delayMs, 0, MAX_DELAY_MS, 0)
+  };
 }
 
 /** How a run ended: every step ran, it stopped at a failure, or it was cancelled. */
@@ -66,6 +108,8 @@ export type RunnerEvent =
 
 export interface RunnerResult {
   steps: RunnerStep[];
+  /** How many passes over the plan the run was set up for. */
+  iterations: number;
   ended: RunnerEnd;
   summary: RunnerSummary;
 }
@@ -131,7 +175,42 @@ export function summarize(steps: RunnerStep[]): RunnerSummary {
 }
 
 /** A step not started yet. */
-export const pendingStep = (item: RunnerPlanItem): RunnerStep => ({ ...item, runId: '', status: 'pending', tests: { passed: 0, failed: 0, errors: 0 }, testResults: [] });
+export const pendingStep = (item: RunnerPlanItem, iteration = 1): RunnerStep => ({ ...item, iteration, runId: '', status: 'pending', tests: { passed: 0, failed: 0, errors: 0 }, testResults: [] });
+
+/** Every step of a run: the plan once per iteration. */
+export function plannedSteps(plan: RunnerPlanItem[], iterations = 1): RunnerStep[] {
+  const out: RunnerStep[] = [];
+  for (let i = 1; i <= iterations; i++) for (const item of plan) out.push(pendingStep(item, i));
+  return out;
+}
+
+/** One iteration's steps, for showing a long run a pass at a time. */
+export interface IterationGroup {
+  iteration: number;
+  /** Index of its first step in the run. */
+  start: number;
+  steps: RunnerStep[];
+  summary: RunnerSummary;
+  /** Every step has finished (or was skipped). */
+  done: boolean;
+}
+
+export function groupByIteration(steps: RunnerStep[]): IterationGroup[] {
+  const groups: IterationGroup[] = [];
+  let current: { iteration: number; start: number; steps: RunnerStep[] } | undefined;
+  steps.forEach((s, i) => {
+    if (!current || current.iteration !== s.iteration) {
+      current = { iteration: s.iteration, start: i, steps: [] };
+      groups.push(current as IterationGroup);
+    }
+    current.steps.push(s);
+  });
+  for (const g of groups) {
+    g.summary = summarize(g.steps);
+    g.done = g.steps.every((s) => s.status !== 'pending' && s.status !== 'running');
+  }
+  return groups;
+}
 
 /** A step filled in from its request's result. Requests a script sent are inside the result and never steps of their own. */
 export function finishedStep(step: RunnerStep, r: RunResult): RunnerStep {

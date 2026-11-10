@@ -65,7 +65,24 @@ Each request gets a result:
 - **Error**: there was no response: not sent (a missing `{{variable}}`, say), connection failed or timed out.
 - **No tests**: a response under 400 with nothing to check it. It isn't counted as a passed test.
 
-Tick **Stop after the first failure** to stop at the first *Failed* or *Error*; the rest are marked *Not run*. Otherwise every request is sent. The summary counts requests by result and, separately, the tests that passed and failed. Click a request for the reason and its tests, **Open request**, or **Show in Dev tools**. **Cancel run** stops the request being sent and sends nothing after it. You can close the runner while it works; the footer shows its progress, and clicking that opens it again. Every request in a run goes to its history and to Dev tools, like a request sent from its tab. Requests that scripts send with `bru.sendRequest` show in Dev tools under the request that sent them, not as results of their own. One run at a time; runs don't repeat with data files or on a schedule.
+Tick **Stop after the first failure** to stop at the first *Failed* or *Error*; the rest are marked *Not run*. Otherwise every request is sent. The summary counts requests by result and, separately, the tests that passed and failed. Click a request for the reason and its tests, **Open request**, or **Show in Dev tools**. **Cancel run** stops the request being sent and sends nothing after it. You can close the runner while it works; the footer shows its progress, and clicking that opens it again. Every request in a run goes to its history and to Dev tools, like a request sent from its tab. Requests that scripts send with `bru.sendRequest` show in Dev tools under the request that sent them, not as results of their own. One run at a time, and runs don't happen on a schedule.
+
+#### Data files, iterations and delay
+
+To run the same requests with different values, click **Choose CSV or JSON…** next to **Data file** and pick a file:
+
+- **CSV:** the first line names the variables, then one row per iteration, like `username,city`. Put a value in double quotes when it has a comma, a quote (written `""`) or a line break. UTF-8, with or without a BOM (Excel's *CSV UTF-8*).
+- **JSON:** an array of objects, one per iteration, like `[{ "username": "asha" }, { "username": "ravi" }]`. Numbers and true/false become text.
+
+The run goes through every request once per row. In each iteration, the row's values are variables for that iteration, over the environment's values (`{{username}}` in a URL, `bru.getVar("username")` in a script). After the iteration they are gone, and the environment's values apply again. An empty cell is an empty value, so a request that uses it isn't sent, as with an empty environment value. The file is read again when a run starts, so you can edit it between runs. Its path stays on this computer, in memory: it is never written to the collection's files.
+
+Without a data file, set **Iterations** to repeat the run (up to 1,000). **Delay** waits that many milliseconds between requests, within an iteration and between iterations (up to 60,000). **Cancel run** stops a wait too.
+
+With more than one iteration the results are grouped by iteration. Iterations that passed stay closed; the one running and the first few that failed open by themselves. Click an iteration to open or close it. *Stop after the first failure* stops the whole run, not just the iteration.
+
+#### Reports
+
+When a run has finished, **JUnit XML…** and **HTML report…** save it to a file. The JUnit report has a test suite per request and iteration and a test case per test or assertion; a request without tests, or one that got no response, gets one case for the request. CI tools such as Jenkins, GitLab and Azure DevOps read it. The HTML report is one file with no scripts and nothing loaded from elsewhere, so it opens anywhere. Both are built from the results as history keeps them: secret values show as `«secret:name»` and `Authorization`, `Cookie` and `Set-Cookie` headers as `«redacted»`.
 
 ## 5. Share collections with Git
 

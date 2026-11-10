@@ -96,7 +96,9 @@ export function createApi(invoke: Invoke, subscribe: Subscribe): YeptApi {
     runner: {
       start: (runnerId, nodeId, options) => invoke('runner:start', runnerId, nodeId, options),
       cancel: (runnerId) => invoke('runner:cancel', runnerId),
-      onEvent: (cb) => subscribe('runner:event', cb)
+      onEvent: (cb) => subscribe('runner:event', cb),
+      pickDataFile: () => invoke('runner:pick-data-file'),
+      exportReport: (runnerId, format) => invoke('runner:export-report', runnerId, format)
     },
     oauth2: {
       token: (requestId, doc, action) => invoke('oauth2:token', requestId, doc, action)

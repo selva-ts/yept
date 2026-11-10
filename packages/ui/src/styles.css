@@ -586,6 +586,14 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line); border-bottom-width
 .runner-setup { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin: 4px 0 8px; }
 .runner-setup .spacer { flex: 1; }
 .runner-help { margin: 0 0 10px; line-height: 1.45; }
+.runner-repeat { gap: 8px 18px; }
+.runner-number { width: 90px; flex: none !important; }
+.runner-data { gap: 8px; min-width: 0; }
+.runner-data-name { font-family: var(--mono); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.runner-export { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; }
+.runner-iteration { cursor: pointer; }
+.runner-iteration td { background: var(--panel-2); border-bottom: 1px solid var(--line); }
+.runner-iteration:hover td { background: var(--sel); }
 .runner-summary { display: grid; gap: 4px; padding: 10px 12px; margin-bottom: 10px; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--panel-2); }
 .runner-counts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; }
 .runner-steps { width: 100%; border-collapse: collapse; font-size: 12.5px; }

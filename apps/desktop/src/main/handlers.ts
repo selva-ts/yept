@@ -5,7 +5,7 @@ import { splitPickedFiles } from '@yept/core/engine/runner/multipart';
 import { WorkspaceService } from '@yept/core/services/workspace-service';
 import { RunService } from '@yept/core/services/run-service';
 import { CollectionRunService } from '@yept/core/services/collection-run-service';
-import type { RunnerOptions } from '@yept/core/shared/collection-run';
+import { cleanRunnerOptions } from '@yept/core/shared/collection-run';
 import { parseCurl, requestFromCurl } from '@yept/core/shared/curl';
 import { EnvService } from '@yept/core/services/env-service';
 import { SettingsService } from '@yept/core/services/settings-service';
@@ -24,7 +24,7 @@ export function createHandlers(host: AppHost): { handlers: HandlerRegistry; clos
   const appSettings = new SettingsService(host);
   const cookies = new CookieService(ws, env, appSettings, host);
   const runs = new RunService(env, appSettings, cookies, host);
-  const runner = new CollectionRunService(ws, runs, (e) => host.emit('runner:event', e));
+  const runner = new CollectionRunService(ws, runs, (e) => host.emit('runner:event', e), host);
   const gitService = new GitService(ws, env, (path) => host.trash(path), () => workspaces.refreshAfterGit(), (fn) => workspaces.duringGit(fn));
   const importer = new ImportService(ws, env, host);
   const mutate = async (fn: () => Promise<string | void>): Promise<MutationResult> => {
@@ -90,8 +90,10 @@ export function createHandlers(host: AppHost): { handlers: HandlerRegistry; clos
     return runs.start(runId, { requestId, requestName: doc.name, requestPath: path, ctx: await ws().requestContext(requestId) }, doc);
   });
   handle('runs:cookie-value', (runId: string, index: number) => runs.cookieValue(runId, index));
-  handle('runner:start', (runnerId: string, nodeId: string, options: RunnerOptions) => runner.start(runnerId, nodeId, { environment: typeof options?.environment === 'string' ? options.environment : null, stopOnFailure: !!options?.stopOnFailure }));
+  handle('runner:start', (runnerId: string, nodeId: string, options: unknown) => runner.start(runnerId, nodeId, cleanRunnerOptions(options)));
   handle('runner:cancel', (runnerId: string) => runner.cancel(runnerId));
+  handle('runner:pick-data-file', () => runner.pickDataFile());
+  handle('runner:export-report', (runnerId: string, format: unknown) => runner.exportReport(runnerId, format === 'html' ? 'html' : 'junit'));
   handle('oauth2:token', async (requestId: string, doc: RequestDoc, action: 'status' | 'fetch' | 'forget') => runs.oauth2Token(await ws().requestContext(requestId), doc, action));
 
   handle('history:list', (requestId: string) => runs.history.list(requestId));
