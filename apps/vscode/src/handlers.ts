@@ -1,4 +1,5 @@
-import { join } from 'node:path';
+import { writeFile } from 'node:fs/promises';
+import { basename, join } from 'node:path';
 import { HandlerRegistry } from '@yept/core/shared/handler-registry';
 import type { AppSettings, RunResult } from '@yept/core/shared/model';
 import type { AppHost } from '@yept/core/services/host';
@@ -15,6 +16,7 @@ import { LocalStore } from '@yept/core/engine/env/local-store';
 import { HistoryStore } from '@yept/core/engine/history/store';
 import { cookieKey, cookieView, environment, nullableText, requestDoc, text, tlsSettings } from './validation';
 import { devToolsResult, previewResult } from './body-document';
+import { mediaBytes } from '@yept/core/services/media-bytes';
 import type { Workspace } from '@yept/core/engine/workspace/workspace';
 
 /** The settings VS Code owns (`yept.*`), read at each use so a change applies without a reload. */
@@ -118,7 +120,12 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
 
   // Results go to the page with large bodies cut to a preview; the run ids of text bodies are kept for "Open in editor".
   const shownBodies = new Map<string, ShownBody>();
+  // Every run the page was shown, text or binary, for "Save to file" and the image and PDF preview.
+  const shownRuns = new Set<string>();
   const shown = <T extends RunResult>(runId: string, result: T, requestName: string): T => {
+    shownRuns.delete(runId);
+    shownRuns.add(runId);
+    while (shownRuns.size > SHOWN_BODIES) shownRuns.delete(shownRuns.keys().next().value!);
     if (!result.body.binary) {
       shownBodies.delete(runId);
       shownBodies.set(runId, { runId, contentType: result.body.contentType, requestName });
@@ -207,6 +214,12 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
     hooks.onSave?.();
     return changed(list);
   });
+  handle('env:set-runtime', 4, (id, name, variable, value) => {
+    text(variable);
+    text(value);
+    env.setRuntime(id, existing(id, name), variable, value);
+    hooks.onEnvChange?.();
+  });
   handle('env:clear-runtime', 2, (id, name) => { env.clearRuntime(id, existing(id, name)); });
   handle('env:pick-ca-file', 0, async () => {
     const result = await host.openDialog({ title: 'Choose a CA certificate (PEM)', properties: ['openFile'], filters: [{ name: 'Certificates', extensions: ['pem', 'crt', 'cer'] }] });
@@ -260,6 +273,22 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
     if (!hooks.openBody) throw new Error('Opening a body in an editor is not available here');
     await hooks.openBody(body);
   });
+  // A run the page was shown, or a stored run of a request in this folder; its body stays here until saved or previewed.
+  const shownBody = (id: unknown): Buffer | undefined => {
+    text(id);
+    if (!shownRuns.has(id)) history(id);
+    return runs.body(id);
+  };
+  handle('runs:save-body', 2, async (id, suggestedName) => {
+    text(suggestedName);
+    const body = shownBody(id);
+    if (!body) throw new Error('This response is no longer available to save. Send the request again.');
+    const result = await host.saveDialog({ title: 'Save response body', defaultPath: basename(suggestedName.replace(/\\/g, '/')) || 'response.bin' });
+    if (result.canceled || !result.filePath) return null;
+    await writeFile(result.filePath, body);
+    return result.filePath;
+  });
+  handle('runs:body-bytes', 1, (id) => mediaBytes(shownBody(id)));
   handle('oauth2:token', 3, async (id, doc, action) => {
     request(id);
     requestDoc(doc);

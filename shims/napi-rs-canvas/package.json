@@ -1,0 +1,8 @@
+{
+  "name": "@napi-rs/canvas",
+  "version": "0.0.0-local-shim",
+  "private": true,
+  "license": "MIT",
+  "description": "Local stand-in for @napi-rs/canvas, an optional native module pdfjs-dist uses only under Node. Yept renders PDFs in the browser, where it is never loaded.",
+  "main": "index.js"
+}

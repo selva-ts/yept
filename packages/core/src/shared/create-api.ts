@@ -46,6 +46,7 @@ export function createApi(invoke: Invoke, subscribe: Subscribe): YeptApi {
       revealSecret: (c, e, n) => invoke('env:reveal-secret', c, e, n),
       setTls: (c, e, t) => invoke('env:set-tls', c, e, t),
       storeAsSecret: (c, e, n, v) => invoke('env:store-as-secret', c, e, n, v),
+      setRuntime: (c, e, n, v) => invoke('env:set-runtime', c, e, n, v),
       clearRuntime: (c, e) => invoke('env:clear-runtime', c, e),
       preview: (id, doc) => invoke('env:preview', id, doc),
       pickCaFile: () => invoke('env:pick-ca-file')
@@ -89,6 +90,7 @@ export function createApi(invoke: Invoke, subscribe: Subscribe): YeptApi {
       start: (runId, requestId, doc) => invoke('runs:start', runId, requestId, doc),
       cancel: (runId) => invoke('runs:cancel', runId),
       saveBody: (runId, name) => invoke('runs:save-body', runId, name),
+      bodyBytes: (runId) => invoke('runs:body-bytes', runId),
       curlWithSecrets: (runId, language) => invoke('runs:curl-with-secrets', runId, language),
       rawWithSecrets: (runId) => invoke('runs:raw-with-secrets', runId),
       cookieValue: (runId, index) => invoke('runs:cookie-value', runId, index)

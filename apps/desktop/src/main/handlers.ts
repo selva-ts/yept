@@ -12,6 +12,7 @@ import { SettingsService } from '@yept/core/services/settings-service';
 import { GitService } from './git-service';
 import { ImportService } from '@yept/core/services/import-service';
 import { CookieService } from '@yept/core/services/cookie-service';
+import { mediaBytes } from '@yept/core/services/media-bytes';
 import type { AppMetrics, MutationResult } from '@yept/core/shared/ipc';
 import { APPEARANCE_KEYS, type Appearance, type AppSettings, type CookieView, type Environment, type GitFile, type RequestDoc, type SettingsDoc, type TlsSettings } from '@yept/core/shared/model';
 
@@ -77,6 +78,7 @@ export function createHandlers(host: AppHost): { handlers: HandlerRegistry; clos
   handle('env:reveal-secret', (c: string, e: string, n: string) => env.revealSecret(c, e, n));
   handle('env:set-tls', (c: string, e: string, tls: TlsSettings) => env.setTls(c, e, tls));
   handle('env:store-as-secret', (c: string, e: string, n: string, v: string) => env.storeAsSecret(c, e, n, v));
+  handle('env:set-runtime', (c: string, e: string, n: string, v: string) => env.setRuntime(c, e, n, v));
   handle('env:clear-runtime', (c: string, e: string) => env.clearRuntime(c, e));
   handle('env:preview', async (requestId: string, doc: RequestDoc) => env.requestPreview(await ws().requestContext(requestId), doc));
   handle('env:pick-ca-file', async () => {
@@ -158,6 +160,7 @@ export function createHandlers(host: AppHost): { handlers: HandlerRegistry; clos
     await fs.writeFile(r.filePath, body);
     return r.filePath;
   });
+  handle('runs:body-bytes', (runId: string) => mediaBytes(runs.body(runId)));
 
   handle('runs:curl-with-secrets', (runId: string, language?: unknown) => runs.curlWithSecrets(runId, language ?? 'curl'));
   handle('runs:raw-with-secrets', (runId: string) => runs.rawWithSecrets(runId));

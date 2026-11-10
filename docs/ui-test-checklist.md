@@ -190,6 +190,22 @@ For the installed build, run `dist\Yept-Setup-0.9.0.exe` instead of `npm run dev
 | **JUnit XML…** and **HTML report…** after a run with secrets (basic auth, a secret in a URL) | Save dialog on top of the app (VS Code: its own save dialog); the files show «redacted» and «secret:…», never the values; the HTML opens in a browser offline, in light and dark mode | |
 | The same in the VS Code extension's runner panel | Data file, iterations, delay and both exports work as on the desktop | |
 
+## L. Response tools
+
+| Check | Expected | Result |
+|---|---|---|
+| A large JSON response (a few MB under the 2 MB format limit, e.g. a long list); type `$..id` quickly into **Filter** | The window keeps up while typing; the match count updates; over 10,000 matches says "First 10,000 matches" | |
+| Select a value in the Pretty body with the mouse (a quoted string, a number, an object); **Set as variable…**, and the editor's right-click **Set as variable…** | The dialog shows the value without the quotes; an object as compact JSON | |
+| **Set as variable…** with nothing selected and a filter matching several values | A message asks to narrow the filter or select a value; no dialog | |
+| **Set as variable…** with no environment selected | The dialog says to choose an environment first; **Set variable** is disabled | |
+| Store a token as a **Local secret**, then open **Environments** | The name is marked secret, its value masked; the environment file in Git shows only the name | |
+| **Save to file…** on a real download (zip, PNG, PDF), then open the saved file | It opens in its usual app; the suggested name matches the server's file name | |
+| A PNG, JPEG, GIF, SVG and a multi-page PDF, light and dark mode, each theme | Drawn on a neutral background; transparent images show a checkerboard; the PDF note gives the page count; app colours unchanged around it | |
+| A PDF with links and a form | Pages drawn as pictures; clicking does nothing; no window opens | |
+| History → **Compare** → pick two runs, then a third; **Close comparison** | The pair changes to the last two picked; changed rows highlighted; Headers and Body diffs side by side; Close returns to the response | |
+| Compare in a narrow window and keyboard only (Tab, Space on the runs) | The table wraps without overlap; the diff stays usable | |
+| VS Code extension: Filter, Set as variable, Save to file (VS Code's save dialog), image and PDF preview, Compare | The same as on the desktop | |
+
 ## Reporting
 
 Note failures with steps, window size, theme and scaling, plus a screenshot. Never include tokens or real hostnames. Fixes go back through `npm run typecheck`, `npm test` and `npm run e2e` before the next installer build.

@@ -12,6 +12,9 @@ import type { EnvironmentList, RequestPreview } from '@yept/core/shared/ipc';
 import type { AuthConfig, Environment, EnvironmentView, RequestDoc, ResolvedVar, TlsSettings } from '@yept/core/shared/model';
 import type { AppHost } from './host';
 
+/** What {{name}} can refer to and a collection file can hold. */
+export const VARIABLE_NAME = /^[A-Za-z_][\w.-]{0,127}$/;
+
 export interface RunEnvironment {
   environment: string;
   layers: VarLayers;
@@ -132,6 +135,14 @@ export class EnvService {
     const dir = this.ws().collectionDir(collectionId);
     const envs = this.ws().listEnvironments(collectionId).map((e) => e.env.name);
     for (const v of values) for (const env of v.environment ? [v.environment] : envs) this.local().setSecret(dir, env, v.name, v.value);
+  }
+
+  /** Sets one runtime variable for this session, as an extraction would ("Set as variable" in the response). */
+  setRuntime(collectionId: string, env: string, name: string, value: string): void {
+    if (!this.ws().getEnvironment(collectionId, env)) throw new Error(`Environment not found: ${env}`);
+    if (!VARIABLE_NAME.test(name)) throw new Error('Use letters, digits, _ . or - for the variable name');
+    const k = this.key(this.ws().collectionDir(collectionId), env);
+    this.runtime.set(k, { ...(this.runtime.get(k) ?? {}), [name]: value });
   }
 
   clearRuntime(collectionId: string, env: string): void {

@@ -195,6 +195,8 @@ export interface YeptApi {
     setTls: (collectionId: string, env: string, tls: TlsSettings) => Promise<EnvironmentList>;
     /** Declares `name` as a secret in the environment file (if needed) and stores `value` locally. */
     storeAsSecret: (collectionId: string, env: string, name: string, value: string) => Promise<EnvironmentList>;
+    /** Sets a runtime variable of an environment for this session (not saved anywhere). */
+    setRuntime: (collectionId: string, env: string, name: string, value: string) => Promise<void>;
     /** Forgets runtime and session variables (e.g. extracted tokens that aren't secrets) for an environment. */
     clearRuntime: (collectionId: string, env: string) => Promise<void>;
     preview: (requestId: string, doc: RequestDoc) => Promise<RequestPreview>;
@@ -255,6 +257,11 @@ export interface YeptApi {
     cancel: (runId: string) => Promise<void>;
     /** Shows a save dialog and writes the raw response bytes. Resolves the saved path, or null if cancelled. */
     saveBody: (runId: string, suggestedName: string) => Promise<string | null>;
+    /**
+     * The response body as base64, for the image and PDF preview: the bytes as received for recent runs, else the stored
+     * history body. Refused above MEDIA_PREVIEW_MAX_BYTES.
+     */
+    bodyBytes: (runId: string) => Promise<string>;
     /** The request as a cURL command (or as code in another language) with secrets and cookies included. Only for recent runs of this session. */
     curlWithSecrets: (runId: string, language?: SnippetLanguage) => Promise<string>;
     /** The raw HTTP request head of the last request sent, with secrets and cookies. Only for recent runs of this session. */
