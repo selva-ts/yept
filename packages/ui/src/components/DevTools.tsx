@@ -3,7 +3,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppMetrics } from '@shared/ipc';
 import type { CookieView, NetworkHop, PhaseTimings, RunResult } from '@shared/model';
-import { toCurl } from '@shared/curl';
+import { toCurl, type CurlRequest } from '@shared/curl';
+import { SNIPPET_LANGUAGES, snippetLabel, toSnippet, type SnippetLanguage } from '@shared/snippets';
 import { rawRequestHead, rawResponseHead } from '@shared/raw-http';
 import { errorMessage, formatBytes, formatMs, yept } from '../api';
 import { useStore } from '../store';
@@ -284,6 +285,66 @@ function ScriptLinks({ entry }: { entry: RunEntry }): React.JSX.Element | null {
   );
 }
 
+/** "Copy as": the request as code in another language. Secrets stay masked unless asked for, each time the menu opens. */
+function CopyAsMenu({ disabled, secretsAvailable, onCopy }: { disabled: boolean; secretsAvailable: boolean; onCopy: (language: SnippetLanguage, withSecrets: boolean) => void }): React.JSX.Element {
+  const [at, setAt] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
+  const [withSecrets, setWithSecrets] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (at) list.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+  }, [at]);
+  const open = (): void => {
+    const b = button.current!.getBoundingClientRect();
+    const right = Math.max(4, window.innerWidth - b.right);
+    // Opens upwards when there isn't room below (Dev Tools sits at the bottom of the window).
+    setWithSecrets(false);
+    setAt(window.innerHeight - b.bottom >= 260 || b.top < 260 ? { top: b.bottom + 4, right } : { bottom: window.innerHeight - b.top + 4, right });
+  };
+  const close = (refocus: boolean): void => {
+    setAt(null);
+    if (refocus) button.current?.focus();
+  };
+  const focusItem = (step: number): void => {
+    const all = [...(list.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])];
+    const i = all.indexOf(document.activeElement as HTMLButtonElement);
+    all[(i + step + all.length) % all.length]?.focus();
+  };
+  return (
+    <>
+      <button ref={button} className="btn ghost small" aria-haspopup="menu" aria-expanded={!!at} disabled={disabled} onClick={() => (at ? close(false) : open())}>
+        Copy as <span aria-hidden="true">▾</span>
+      </button>
+      {at && (
+        <>
+          <div className="dt-menu-backdrop" onMouseDown={() => close(false)} />
+          <div
+            ref={list}
+            className="menu dt-copy-menu"
+            role="menu"
+            aria-label="Copy as"
+            style={at}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown') { e.preventDefault(); focusItem(1); }
+              else if (e.key === 'ArrowUp') { e.preventDefault(); focusItem(-1); }
+              else if (e.key === 'Escape') { e.preventDefault(); close(true); }
+            }}
+          >
+            <button role="menuitemcheckbox" aria-checked={withSecrets} disabled={!secretsAvailable} onClick={() => setWithSecrets((v) => !v)}
+              title="Includes secret values and cookies. Available for the last 50 requests sent in this session.">
+              <span className="menu-check" aria-hidden="true">{withSecrets ? '✓' : ''}</span>Include secrets and cookies
+            </button>
+            <hr />
+            {SNIPPET_LANGUAGES.map((l) => (
+              <button key={l.id} role="menuitem" onClick={() => { close(true); onCopy(l.id, withSecrets); }}><span className="menu-check" aria-hidden="true" />{l.label}</button>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 function NetworkDetails({ entry, format, setFormat }: { entry: RunEntry; format: HeadFormat; setFormat: (f: HeadFormat) => void }): React.JSX.Element {
   const [view, setView] = useState<'request' | 'response' | 'timing' | 'connection'>('request');
   const [showCookies, setShowCookies] = useState(false);
@@ -299,11 +360,13 @@ function NetworkDetails({ entry, format, setFormat }: { entry: RunEntry; format:
   const hop: NetworkHop | undefined = hops[Math.min(Math.max(hopIndex, 0), hops.length - 1)];
   const isFinal = !hop || hop === hops[hops.length - 1];
   const sentHeaders = hop?.requestHeaders.length ? hop.requestHeaders : r.request.headers;
-  const curl = (): string => toCurl({ method: hop?.method ?? r.request.method, url: hop?.url ?? r.request.url, headers: sentHeaders, body: isFinal && !r.multipart ? r.requestBody : undefined, form: isFinal ? r.multipart : undefined });
-  const copy = async (withSecrets: boolean): Promise<void> => {
+  const masked: CurlRequest = { method: hop?.method ?? r.request.method, url: hop?.url ?? r.request.url, headers: sentHeaders, body: isFinal && !r.multipart ? r.requestBody : undefined, form: isFinal ? r.multipart : undefined };
+  // Masked from what the page has; with secrets only from the main process, which kept the unmasked request.
+  const copy = async (language: SnippetLanguage, withSecrets: boolean): Promise<void> => {
     try {
-      await yept.clipboard.write(withSecrets ? await yept.runs.curlWithSecrets(r.runId) : curl());
-      toast(withSecrets ? 'Copied as cURL, including secrets and cookies' : 'Copied as cURL (secrets masked)');
+      await yept.clipboard.write(withSecrets ? await yept.runs.curlWithSecrets(r.runId, language) : language === 'curl' ? toCurl(masked) : toSnippet(language, masked));
+      const label = snippetLabel(language);
+      toast(withSecrets ? `Copied as ${label}, including secrets and cookies` : `Copied as ${label} (secrets masked)`);
     } catch (e) {
       toast(errorMessage(e), 'error');
     }
@@ -333,8 +396,9 @@ function NetworkDetails({ entry, format, setFormat }: { entry: RunEntry; format:
         <span className="dt-actions">
           {(view === 'request' || view === 'response') && <FormatToggle format={format} onChange={setFormat} />}
           <button className="btn ghost small" onClick={() => void host.openRun(entry.requestId, entry.parentRunId ?? entry.runId)} title={entry.parentRunId ? 'Opens the request whose script sent this one' : undefined}>Open request</button>
-          <button className="btn ghost small" onClick={() => void copy(false)} disabled={!hops.length && r.outcome === 'prepare_error'}>Copy as cURL</button>
-          <button className="btn ghost small" onClick={() => void copy(true)} disabled={!hops.length} title="Includes secret values and cookies. Available for the last 50 requests sent in this session.">…with secrets</button>
+          <button className="btn ghost small" onClick={() => void copy('curl', false)} disabled={!hops.length && r.outcome === 'prepare_error'}>Copy as cURL</button>
+          <button className="btn ghost small" onClick={() => void copy('curl', true)} disabled={!hops.length} title="Includes secret values and cookies. Available for the last 50 requests sent in this session.">…with secrets</button>
+          <CopyAsMenu disabled={!hops.length && r.outcome === 'prepare_error'} secretsAvailable={hops.length > 0} onCopy={(language, withSecrets) => void copy(language, withSecrets)} />
         </span>
       </div>
       <ScriptLinks entry={entry} />

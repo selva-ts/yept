@@ -157,7 +157,7 @@ export function createHandlers(host: AppHost): { handlers: HandlerRegistry; clos
     return r.filePath;
   });
 
-  handle('runs:curl-with-secrets', (runId: string) => runs.curlWithSecrets(runId));
+  handle('runs:curl-with-secrets', (runId: string, language?: unknown) => runs.curlWithSecrets(runId, language ?? 'curl'));
   handle('runs:raw-with-secrets', (runId: string) => runs.rawWithSecrets(runId));
 
   type CookieKey = Pick<CookieView, 'domain' | 'path' | 'name'>;

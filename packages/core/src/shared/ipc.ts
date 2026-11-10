@@ -1,5 +1,6 @@
 // Typed contract between renderer and main. Keep it narrow: the renderer never touches Node, files or the network.
 import type { RunnerEvent, RunnerOptions, RunnerResult } from './collection-run';
+import type { SnippetLanguage } from './snippets';
 import type { Appearance, AppSettings, AuthConfig, CookieView, Environment, OAuth2TokenStatus, EnvironmentView, GitFile, HistoryEntry, HistorySummary, ImportSecretFinding, LeakFinding, OrphanedHistory, RequestDoc, ResolvedVar, RunResult, SettingsDoc, TlsSettings, WorkspaceSnapshot } from './model';
 
 export interface SelfTestResult {
@@ -254,8 +255,8 @@ export interface YeptApi {
     cancel: (runId: string) => Promise<void>;
     /** Shows a save dialog and writes the raw response bytes. Resolves the saved path, or null if cancelled. */
     saveBody: (runId: string, suggestedName: string) => Promise<string | null>;
-    /** The request as a cURL command with secrets and cookies included. Only for recent runs of this session. */
-    curlWithSecrets: (runId: string) => Promise<string>;
+    /** The request as a cURL command (or as code in another language) with secrets and cookies included. Only for recent runs of this session. */
+    curlWithSecrets: (runId: string, language?: SnippetLanguage) => Promise<string>;
     /** The raw HTTP request head of the last request sent, with secrets and cookies. Only for recent runs of this session. */
     rawWithSecrets: (runId: string) => Promise<string>;
     /** Explicit reveal of one recorded cookie value, in memory for the last 50 sends only. */
