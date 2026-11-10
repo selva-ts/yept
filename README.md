@@ -24,7 +24,7 @@ The application is MIT licensed, needs no Yept account and has no telemetry. Col
 
 ![A synthetic request and response with network diagnostics in Yept](docs/images/request-diagnostics.png)
 
-Screenshots use an isolated profile and synthetic fixtures. See the [user guide](docs/user-guide.md) for the interface and keyboard shortcuts.
+Screenshots use an isolated profile and synthetic fixtures. See the [user guide](docs/user-guide.md) for the interface and keyboard shortcuts. To run the same requests and tests in CI with Bruno's CLI, see [running collections in CI](docs/ci.md).
 
 ## Downloads and platform status
 
