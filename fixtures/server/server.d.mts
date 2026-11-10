@@ -2,6 +2,8 @@ import type { Server } from 'node:http';
 
 export const CLIENT_ID: string;
 export const CLIENT_SECRET: string;
+export const OAUTH_USER: string;
+export const OAUTH_PASSWORD: string;
 export function createFixtureServer(): Server;
 export function fixturePng(): Buffer;
 export function fixturePdf(): Buffer;

@@ -2,12 +2,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
-import { createFixtureServer, CLIENT_ID, CLIENT_SECRET } from '../../../../../fixtures/server/server.mjs';
+import { createFixtureServer, CLIENT_ID, CLIENT_SECRET, OAUTH_PASSWORD, OAUTH_USER } from '../../../../../fixtures/server/server.mjs';
 import { DEFAULT_OAUTH2, emptyAuth, type AuthConfig, type OAuth2Config, type RequestDoc } from '../../shared/model';
 import { emptyEnvLayer, type VarLayers } from '../env/variables';
-import { run, type RunOptions } from '../runner/runner';
+import { getAgents, run, type RunOptions } from '../runner/runner';
 import { applyRequestDoc, parseRequestFile, stringifyRequestFile, toRequestDoc } from '../workspace/bruno-adapter';
-import { TokenCache } from './oauth2';
+import { fetchOAuth2Token, resolveOAuth2, TokenCache } from './oauth2';
+import { authorizeInBrowser } from './oauth2-browser';
 
 let server: Server;
 let base = '';
@@ -24,6 +25,7 @@ afterAll(() => {
 
 const tokenRequests = async (): Promise<number> => (await (await fetch(`${base}/auth/stats`)).json()).tokenRequests;
 const revokeAll = async (): Promise<void> => void (await fetch(`${base}/auth/revoke`, { method: 'POST' }));
+const grantCount = async (grant: string): Promise<number> => (await (await fetch(`${base}/auth/stats`)).json()).tokenGrants[grant] ?? 0;
 
 const oauth = (over: Partial<OAuth2Config> = {}): AuthConfig => ({
   ...emptyAuth(),
@@ -177,6 +179,141 @@ describe('OAuth2 client credentials', () => {
   });
 });
 
+describe('OAuth2 password and authorization code', () => {
+  const password = (over: Partial<OAuth2Config> = {}) => oauth({ grantType: 'password', username: OAUTH_USER, password: OAUTH_PASSWORD, ...over });
+  const interactive = (over: Partial<OAuth2Config> = {}) => oauth({
+    grantType: 'authorization_code', authorizationUrl: `${base}/auth/authorize`, accessTokenUrl: `${base}/auth/token`,
+    clientId: CLIENT_ID, clientSecret: '', ...over
+  });
+  const resolved = (auth: AuthConfig) => resolveOAuth2(auth.oauth2, (s) => s);
+  const openFixture = async (url: string): Promise<void> => { await fetch(url); };
+  const exchangeOptions = () => {
+    const agents = getAgents();
+    return { httpAgent: agents.http, httpsAgent: agents.https, timeoutMs: 5000, userAgent: 'Yept fixture' };
+  };
+
+  it('shares one password exchange and one refresh between concurrent sends', async () => {
+    const beforePassword = await grantCount('password');
+    const beforeRefresh = await grantCount('refresh_token');
+    const req = doc({ auth: password({ accessTokenUrl: '{{baseUrl}}/auth/token?expires_in=1', credentialsPlacement: 'body' }) });
+    const options = opts(new TokenCache());
+    const sends = () => Promise.all([run(req, options), run(req, options), run(req, options)]);
+    expect((await sends()).map((r) => r.result.status)).toEqual([200, 200, 200]);
+    const renewed = await sends();
+    expect(renewed.map((r) => r.result.oauth2?.token)).toEqual(['renewed', 'renewed', 'renewed']);
+    expect(await grantCount('password')).toBe(beforePassword + 1);
+    expect(await grantCount('refresh_token')).toBe(beforeRefresh + 1);
+    const output = renewed[0];
+    expect(output.secrets.some((s) => s.value === OAUTH_PASSWORD)).toBe(true);
+    expect(JSON.stringify(output.result)).not.toContain(OAUTH_PASSWORD);
+  });
+
+  it('falls back to password when the refresh endpoint rejects the token', async () => {
+    const beforePassword = await grantCount('password');
+    const beforeRefresh = await grantCount('refresh_token');
+    const req = doc({ auth: password({ accessTokenUrl: '{{baseUrl}}/auth/token?expires_in=1&reject_refresh=1' }) });
+    const options = opts(new TokenCache());
+    expect((await run(req, options)).result.status).toBe(200);
+    expect((await run(req, options)).result.status).toBe(200);
+    expect(await grantCount('password')).toBe(beforePassword + 2);
+    expect(await grantCount('refresh_token')).toBe(beforeRefresh + 1);
+  });
+
+  it('does not renew an expired token when both automatic switches are off', async () => {
+    const beforeRefresh = await grantCount('refresh_token');
+    const cache = new TokenCache();
+    const req = doc({ auth: password({ accessTokenUrl: '{{baseUrl}}/auth/token?expires_in=1' }) });
+    expect((await run(req, opts(cache))).result.status).toBe(200);
+    const off = doc({ auth: password({ accessTokenUrl: '{{baseUrl}}/auth/token?expires_in=1', autoRefreshToken: false, autoFetchToken: false }) });
+    expect((await run(off, opts(cache))).result.error?.message).toMatch(/automatic fetching is off|automatic renewal is off/);
+    expect(await grantCount('refresh_token')).toBe(beforeRefresh);
+  });
+
+  it('renews an expired client credentials token with auto fetch on and auto refresh off', async () => {
+    const before = await tokenRequests();
+    const req = doc({ auth: oauth({ accessTokenUrl: '{{baseUrl}}/auth/token?expires_in=1', autoFetchToken: true, autoRefreshToken: false }) });
+    const options = opts(new TokenCache());
+    expect((await run(req, options)).result.status).toBe(200);
+    const second = await run(req, options);
+    expect(second.result.status).toBe(200);
+    expect(second.result.oauth2?.token).toBe('renewed');
+    expect(await tokenRequests()).toBe(before + 2);
+  });
+
+  it('exchanges a code with the S256 verifier and subsequently sends without opening a browser', async () => {
+    const auth = interactive();
+    const cfg = resolved(auth);
+    const cache = new TokenCache();
+    const options = opts(cache);
+    const req = doc({ auth });
+    const before = await tokenRequests();
+    expect((await run(req, options)).result.error?.message).toMatch(/Use Get token/);
+    expect(await tokenRequests()).toBe(before);
+    const scope = options.oauth2!.scope;
+    const token = await cache.fetch(scope, cfg, (c, previous, signal) => fetchOAuth2Token(c, previous, {
+      ...exchangeOptions(), signal, authorize: () => authorizeInBrowser(c, openFixture, signal)
+    }));
+    expect(token.refreshToken).toBeTruthy();
+    const sent = await run(req, options);
+    expect(sent.result.status).toBe(200);
+    expect(sent.result.oauth2?.token).toBe('cached');
+    expect(JSON.stringify(sent.result)).not.toContain(token.accessToken);
+    expect(JSON.stringify(sent.result)).not.toContain(token.refreshToken!);
+    const beforeRefresh = await grantCount('refresh_token');
+    await revokeAll();
+    expect((await run(req, options)).result.oauth2).toMatchObject({ retried: true, token: 'renewed' });
+    expect(await grantCount('refresh_token')).toBe(beforeRefresh + 1);
+  });
+
+  it('refuses a callback with the wrong state and keeps waiting for its own', async () => {
+    const cfg = resolved(interactive({ authorizationUrl: `${base}/auth/authorize?wrong_state=1` }));
+    const before = await tokenRequests();
+    let status = 0;
+    const open = async (url: string): Promise<void> => { status = (await fetch(url)).status; };
+    await expect(authorizeInBrowser(cfg, open, new AbortController().signal, 1500)).rejects.toThrow('timed out');
+    expect(status).toBe(400);
+    expect(await tokenRequests()).toBe(before);
+  });
+
+  it('a stale callback does not stop the sign-in that follows it', async () => {
+    const cfg = resolved(interactive());
+    let stale = 0;
+    const open = async (url: string): Promise<void> => {
+      const callback = new URL(new URL(url).searchParams.get('redirect_uri')!);
+      callback.searchParams.set('code', 'old-code');
+      callback.searchParams.set('state', 'old-state');
+      stale = (await fetch(callback)).status;
+      await fetch(url);
+    };
+    const code = await authorizeInBrowser(cfg, open, new AbortController().signal);
+    expect(stale).toBe(400);
+    expect(code.code).not.toBe('old-code');
+  });
+
+  it('rejects a different verifier and hides the echoed authorization code', async () => {
+    const cfg = resolved(interactive());
+    const code = await authorizeInBrowser(cfg, openFixture, new AbortController().signal);
+    const response = fetchOAuth2Token(cfg, undefined, { ...exchangeOptions(), authorize: async () => ({ ...code, verifier: 'wrong-verifier' }) });
+    await expect(response).rejects.toThrow(/^The token endpoint answered 400$/);
+  });
+
+  it('cancels the browser listener and leaves the cache empty', async () => {
+    const cfg = resolved(interactive());
+    const cache = new TokenCache();
+    let callback = '';
+    const open = async (url: string): Promise<void> => {
+      callback = new URL(url).searchParams.get('redirect_uri')!;
+      cache.cancel('scope', cfg);
+    };
+    const pending = cache.fetch('scope', cfg, (c, previous, signal) => fetchOAuth2Token(c, previous, {
+      ...exchangeOptions(), signal, authorize: () => authorizeInBrowser(c, open, signal)
+    }));
+    await expect(pending).rejects.toThrow('Cancelled');
+    await expect(fetch(callback)).rejects.toThrow();
+    expect(cache.status('scope', cfg)).toEqual({ state: 'none' });
+  });
+});
+
 describe('OAuth2 in Bruno files', () => {
   const FILE = `info:
   name: Bookings
@@ -230,11 +367,30 @@ settings:
   });
 
   it('leaves other OAuth2 flows exactly as they were', () => {
-    const other = FILE.replace('flow: client_credentials', 'flow: authorization_code');
+    const other = FILE.replace('flow: client_credentials', 'flow: implicit');
     const item = parseRequestFile(other, 'yml');
     const d = toRequestDoc(item);
-    expect(d.auth.oauth2.grantType).toBe('authorization_code');
+    expect(d.auth.oauth2.grantType).toBe('implicit');
     const before = stringifyRequestFile(item);
     expect(stringifyRequestFile(applyRequestDoc(item, { ...d, auth: { ...d.auth, oauth2: { ...d.auth.oauth2, scope: 'changed' } } }))).toBe(before);
+  });
+
+  it('round-trips authorization code settings with default PKCE and a fixed callback', () => {
+    const source = FILE.replace('flow: client_credentials', 'flow: authorization_code\n    authorizationUrl: "{{baseUrl}}/auth/authorize"')
+      .replace('    credentials:', '    callbackUrl: http://127.0.0.1:8123/callback\n    credentials:');
+    const item = parseRequestFile(source, 'yml');
+    const d = toRequestDoc(item);
+    expect(d.auth.oauth2).toMatchObject({ grantType: 'authorization_code', authorizationUrl: '{{baseUrl}}/auth/authorize', callbackUrl: 'http://127.0.0.1:8123/callback', pkce: true });
+    expect(stringifyRequestFile(applyRequestDoc(item, d))).toBe(source);
+  });
+
+  it('round-trips Bruno password and refresh endpoint settings', () => {
+    const source = FILE.replace('flow: client_credentials', 'flow: resource_owner_password_credentials')
+      .replace('    credentials:', '    refreshTokenUrl: "{{baseUrl}}/auth/refresh"\n    credentials:')
+      .replace('    scope:', '    resourceOwner:\n      username: "{{oauthUser}}"\n      password: "{{oauthPassword}}"\n    scope:');
+    const item = parseRequestFile(source, 'yml');
+    const d = toRequestDoc(item);
+    expect(d.auth.oauth2).toMatchObject({ grantType: 'password', username: '{{oauthUser}}', password: '{{oauthPassword}}', refreshTokenUrl: '{{baseUrl}}/auth/refresh' });
+    expect(stringifyRequestFile(applyRequestDoc(item, d))).toBe(source);
   });
 });

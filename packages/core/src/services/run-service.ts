@@ -4,14 +4,15 @@
 import { join } from 'node:path';
 import { interpolate } from '@usebruno/common';
 import { classify, findUnresolved, getAgents, resolveAuth, run, setUserAgent, userAgent } from '@yept/core/engine/runner/runner';
-import { TokenCache, TokenError, fetchClientCredentialsToken, oauth2Fields, resolveOAuth2, tokenScope } from '@yept/core/engine/auth/oauth2';
+import { TokenCache, TokenError, fetchOAuth2Token, maskOAuth2Text, oauth2Fields, resolveOAuth2, tokenScope } from '@yept/core/engine/auth/oauth2';
+import { authorizeInBrowser } from '@yept/core/engine/auth/oauth2-browser';
 import { resolveLayers } from '@yept/core/engine/env/variables';
-import type { OAuth2TokenView } from '@yept/core/shared/ipc';
+import type { OAuth2TokenAction, OAuth2TokenView } from '@yept/core/shared/ipc';
 import { SandboxHost } from '@yept/core/engine/sandbox/host';
 import { HistoryStore } from '@yept/core/engine/history/store';
 import { redactResult } from '@yept/core/engine/history/redact';
 import type { RequestContext } from '@yept/core/engine/workspace/workspace';
-import { OAUTH2_CLIENT_CREDENTIALS, type RequestDoc, type RunResult } from '@yept/core/shared/model';
+import { isOAuth2Grant, type RequestDoc, type RunResult } from '@yept/core/shared/model';
 import type { EnvService } from './env-service';
 import type { SettingsService } from './settings-service';
 import type { CookieService } from './cookie-service';
@@ -80,12 +81,13 @@ export class RunService {
   private cookieValues = new RecentCookies(KEEP_SENT);
   // OAuth2 tokens, in memory only: a restart fetches new ones.
   private tokens = new TokenCache();
+  private manualTokenFetches = new Map<string, () => void>();
   private sandbox: SandboxHost | null = null;
   private historyStore: HistoryStore | null = null;
   private readonly ownsHistory: boolean;
 
   /** A history store passed in is shared with other services and stays open when this one closes. */
-  constructor(private env: EnvService, private settings: SettingsService, private cookies: CookieService, private platform: Pick<AppHost, 'userDataPath' | 'appVersion' | 'sandboxWorkerPath'>, history?: HistoryStore, private options: RunServiceOptions = {}) {
+  constructor(private env: EnvService, private settings: SettingsService, private cookies: CookieService, private platform: Pick<AppHost, 'userDataPath' | 'appVersion' | 'sandboxWorkerPath' | 'openAuthorizationUrl'>, history?: HistoryStore, private options: RunServiceOptions = {}) {
     setUserAgent(`Yept/${this.platform.appVersion()}`);
     this.historyStore = history ?? null;
     this.ownsHistory = !history;
@@ -214,9 +216,13 @@ export class RunService {
    * The OAuth2 token for a request's effective auth (its own or inherited) in the active environment: its status,
    * or a new one ('fetch'), or forgotten ('forget'). The token itself never leaves the main process.
    */
-  async oauth2Token(ctx: RequestContext, doc: RequestDoc, action: 'status' | 'fetch' | 'forget'): Promise<OAuth2TokenView> {
+  async oauth2Token(requestId: string, ctx: RequestContext, doc: RequestDoc, action: OAuth2TokenAction): Promise<OAuth2TokenView> {
+    if (action === 'cancel') {
+      this.manualTokenFetches.get(requestId)?.();
+      return { applies: false };
+    }
     const auth = resolveAuth(doc.auth, { collection: ctx.collection, folders: ctx.folders });
-    if (auth.mode !== 'oauth2' || auth.oauth2.grantType !== OAUTH2_CLIENT_CREDENTIALS) return { applies: false };
+    if (auth.mode !== 'oauth2' || !isOAuth2Grant(auth.oauth2.grantType)) return { applies: false };
     const e = await this.env.forRun(ctx);
     const values = resolveLayers({ ...e.layers, collection: ctx.collection.vars, folders: ctx.folders.map((f) => f.vars), request: doc.vars.req }).values;
     const missing = findUnresolved(oauth2Fields(auth.oauth2), Object.fromEntries(Object.entries(values).filter(([, v]) => typeof v === 'string')) as Record<string, string>);
@@ -227,16 +233,27 @@ export class RunService {
     if (action === 'forget') this.tokens.forget(scope, cfg);
     if (action === 'fetch') {
       const agents = getAgents(e.tls);
+      const open = this.platform.openAuthorizationUrl;
+      const cancel = () => this.tokens.cancel(scope, cfg);
+      this.manualTokenFetches.set(requestId, cancel);
       try {
-        await this.tokens.fetch(scope, cfg, (c) => fetchClientCredentialsToken(c, { httpAgent: agents.http, httpsAgent: agents.https, timeoutMs: DEFAULT_TIMEOUT_MS, userAgent: userAgent() }));
+        await this.tokens.fetch(scope, cfg, (c, previous, signal) => fetchOAuth2Token(c, previous, {
+          httpAgent: agents.http, httpsAgent: agents.https, timeoutMs: DEFAULT_TIMEOUT_MS, userAgent: userAgent(), signal,
+          authorize: open ? (resolved) => authorizeInBrowser(resolved, open, signal) : undefined
+        }));
       } catch (err) {
-        throw new Error(`OAuth2 token request failed: ${err instanceof TokenError ? err.message : classify(err).message}`);
+        const message = err instanceof TokenError ? err.message : classify(err).message;
+        throw new Error(`OAuth2 token request failed: ${maskOAuth2Text(message, [cfg.clientSecret, cfg.password])}`);
+      } finally {
+        if (this.manualTokenFetches.get(requestId) === cancel) this.manualTokenFetches.delete(requestId);
       }
     }
     return { applies: true, environment: e.environment, status: this.tokens.status(scope, cfg) };
   }
 
   async close(): Promise<void> {
+    this.tokens.close();
+    this.manualTokenFetches.clear();
     this.cookieValues.clear();
     await this.sandbox?.close();
     if (this.ownsHistory) this.historyStore?.close();

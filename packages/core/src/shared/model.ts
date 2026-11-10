@@ -64,19 +64,27 @@ export interface RequestSettings {
 }
 
 /**
- * Auth modes Yept edits. Other Bruno modes (wsse, oauth1, ...) and OAuth2 grant types other than client
- * credentials are shown read-only and kept unchanged on save.
+ * Auth modes Yept edits. Other Bruno modes (wsse, oauth1, ...) are shown read-only and kept unchanged on save.
  */
 export const AUTH_MODES = ['inherit', 'none', 'bearer', 'basic', 'apikey', 'oauth2', 'digest', 'awsv4', 'ntlm'] as const;
 export type EditableAuthMode = (typeof AUTH_MODES)[number];
 
-/** The only OAuth2 grant type Yept can send. */
 export const OAUTH2_CLIENT_CREDENTIALS = 'client_credentials';
+export const OAUTH2_AUTHORIZATION_CODE = 'authorization_code';
+export const OAUTH2_PASSWORD = 'password';
+export const OAUTH2_GRANTS = [OAUTH2_CLIENT_CREDENTIALS, OAUTH2_AUTHORIZATION_CODE, OAUTH2_PASSWORD] as const;
+export const isOAuth2Grant = (grant: string): boolean => (OAUTH2_GRANTS as readonly string[]).includes(grant);
 
 export interface OAuth2Config {
-  /** Bruno's grant type. Only client_credentials is edited and sent; other flows are kept unchanged in the file. */
+  /** Bruno's grant type. Unsupported flows are kept unchanged in the file. */
   grantType: string;
   accessTokenUrl: string;
+  refreshTokenUrl?: string;
+  authorizationUrl?: string;
+  callbackUrl?: string;
+  pkce?: boolean;
+  username?: string;
+  password?: string;
   clientId: string;
   clientSecret: string;
   /** Space-separated scopes; '' sends none. */
@@ -142,9 +150,9 @@ export const emptyAuth = (): AuthConfig => ({
   ntlm: { username: '', password: '', domain: '' }
 });
 
-/** True when Yept can edit and send this auth (OAuth2 only with client credentials). */
+/** True when Yept can edit and send this auth. */
 export function isEditableAuth(auth: AuthConfig): boolean {
-  return (AUTH_MODES as readonly string[]).includes(auth.mode) && (auth.mode !== 'oauth2' || auth.oauth2.grantType === OAUTH2_CLIENT_CREDENTIALS);
+  return (AUTH_MODES as readonly string[]).includes(auth.mode) && (auth.mode !== 'oauth2' || isOAuth2Grant(auth.oauth2.grantType));
 }
 
 /** What the Auth tab shows about the cached OAuth2 token. The token itself never leaves the main process. */
@@ -578,7 +586,8 @@ export interface ImportSecretFinding {
   where: string;
   field:
     | 'bearer token' | 'basic password' | 'api key' | 'client secret' | 'digest password' | 'ntlm password' | 'aws secret access key' | 'aws session token'
-    | 'authorization header' | 'environment value';
+    | 'OAuth2 password' | 'authorization header' | 'environment value';
   variable: string;
   preview: string;
+  required?: boolean;
 }

@@ -4,8 +4,9 @@
 import {
   parseRequest, stringifyRequest, parseFolder, stringifyFolder, parseCollection, stringifyCollection, parseEnvironment, stringifyEnvironment
 } from '@usebruno/filestore';
+import yaml from 'js-yaml';
 import type { AuthConfig, BodyMode, Environment, HttpMethod, KeyValue, MultipartField, Param, RequestDoc, Scripts, SettingsDoc } from '../../shared/model';
-import { DEFAULT_OAUTH2, HTTP_METHODS, OAUTH2_CLIENT_CREDENTIALS, isEditableAuth } from '../../shared/model';
+import { DEFAULT_OAUTH2, HTTP_METHODS, OAUTH2_AUTHORIZATION_CODE, OAUTH2_PASSWORD, isEditableAuth } from '../../shared/model';
 
 /** Bruno's parsed objects. Kept opaque on purpose; only this file looks inside. */
 export type BrunoItem = Record<string, any>;
@@ -58,6 +59,9 @@ export function toAuth(a: any, defaultMode: string): AuthConfig {
       ? {
           grantType: text(o.grantType, DEFAULT_OAUTH2.grantType),
           accessTokenUrl: text(o.accessTokenUrl),
+          refreshTokenUrl: text(o.refreshTokenUrl),
+          ...(o.grantType === OAUTH2_AUTHORIZATION_CODE ? { authorizationUrl: text(o.authorizationUrl), callbackUrl: text(o.callbackUrl), pkce: o.pkce !== false } : {}),
+          ...(o.grantType === OAUTH2_PASSWORD ? { username: text(o.username), password: text(o.password) } : {}),
           clientId: text(o.clientId),
           clientSecret: text(o.clientSecret),
           scope: text(o.scope),
@@ -92,11 +96,14 @@ function applyAuth(original: any, auth: AuthConfig): any {
   if (auth.mode === 'apikey') out.apikey = { key: auth.apikey.key, value: auth.apikey.value, placement: auth.apikey.placement };
   if (auth.mode === 'oauth2') {
     const o = auth.oauth2;
+    const previous = original?.mode === 'oauth2' ? original.oauth2 : undefined;
+    const sameGrant = previous?.grantType === o.grantType;
     // Fields Yept doesn't edit (token source, credentials id, additional parameters...) are kept.
     out.oauth2 = {
-      ...(original?.mode === 'oauth2' ? original.oauth2 : {}),
-      grantType: OAUTH2_CLIENT_CREDENTIALS,
+      ...(sameGrant ? previous : {}),
+      grantType: o.grantType,
       accessTokenUrl: o.accessTokenUrl || null,
+      refreshTokenUrl: o.refreshTokenUrl || null,
       clientId: o.clientId || null,
       clientSecret: o.clientSecret || null,
       scope: o.scope || null,
@@ -107,6 +114,16 @@ function applyAuth(original: any, auth: AuthConfig): any {
       autoFetchToken: o.autoFetchToken,
       autoRefreshToken: o.autoRefreshToken
     };
+    if (o.grantType === OAUTH2_AUTHORIZATION_CODE) {
+      out.oauth2.authorizationUrl = o.authorizationUrl || null;
+      out.oauth2.callbackUrl = o.callbackUrl || null;
+      // Preserve the omission in a file that already relied on the default.
+      if (!sameGrant || previous.pkce != null || o.pkce === false) out.oauth2.pkce = o.pkce !== false;
+    }
+    if (o.grantType === OAUTH2_PASSWORD) {
+      out.oauth2.username = o.username || null;
+      out.oauth2.password = o.password || null;
+    }
   }
   // Bruno reads a missing field as null and writes only the fields that are set, so '' is written as null.
   if (auth.mode === 'digest') out.digest = { username: auth.digest.username || null, password: auth.digest.password || null };
@@ -128,7 +145,17 @@ export function isHttpItem(item: BrunoItem): boolean {
 }
 
 export function parseRequestFile(text: string, format: Format): BrunoItem {
-  return parseRequest(text, { format });
+  const item = parseRequest(text, { format });
+  restoreDefaultPkce(item, text, format, 'http');
+  return item;
+}
+
+/** Filestore collapses a missing YAML pkce block and an explicit opt-out to false. */
+function restoreDefaultPkce(item: BrunoItem | null, source: string, format: Format, section: 'http' | 'request'): void {
+  const config = item?.request?.auth?.oauth2;
+  if (format !== 'yml' || config?.grantType !== OAUTH2_AUTHORIZATION_CODE || config.pkce !== false) return;
+  const original = yaml.load(source) as Record<string, { auth?: { pkce?: unknown } }> | undefined;
+  if (original?.[section]?.auth?.pkce === undefined) delete config.pkce;
 }
 
 export function stringifyRequestFile(item: BrunoItem): string {
@@ -247,6 +274,7 @@ export interface FolderMeta {
 
 export function parseFolderFile(text: string, format: Format = 'yml'): FolderMeta {
   const raw = parseFolder(text, { format });
+  restoreDefaultPkce(raw, text, format, 'request');
   return { name: String(raw?.meta?.name ?? ''), seq: Number(raw?.meta?.seq ?? 0), raw };
 }
 
@@ -296,6 +324,7 @@ export interface CollectionFile {
 export function parseCollectionFile(text: string, format: Format): CollectionFile {
   if (format === 'yml') {
     const { collectionRoot, brunoConfig } = parseCollection(text, { format: 'yml' });
+    restoreDefaultPkce(collectionRoot, text, format, 'request');
     return { name: String(brunoConfig?.name ?? ''), root: collectionRoot ?? null, config: brunoConfig ?? {}, hadProxy: /^\s*proxy:/m.test(text) };
   }
   // .bru collections: collection.bru holds the root; the name lives in bruno.json (read separately).

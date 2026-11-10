@@ -152,6 +152,8 @@ export async function run(): Promise<void> {
       const login = collection('Sample Travel').children!.find((c) => c.name === 'Auth')!.children![0];
       const doc = (await invoke('requests:get', login.id)).doc;
       const runId = randomUUID();
+      // Collection runs with a chosen environment leave the active one alone: choose it for this send.
+      await invoke('env:set-active', collection('Sample Travel').id, 'local');
       await invoke('runs:start', runId, login.id, doc);
       await until(() => shown()!.runs === networkBefore + 1, 'the send in Network');
       // Copy as another language, with secrets: rebuilt from the unmasked request kept by the services.

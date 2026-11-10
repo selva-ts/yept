@@ -1,4 +1,4 @@
-import { AUTH_MODES, isEditableAuth, type AuthConfig, type AwsV4Config, type OAuth2Config } from '@shared/model';
+import { AUTH_MODES, OAUTH2_AUTHORIZATION_CODE, OAUTH2_GRANTS, OAUTH2_PASSWORD, isEditableAuth, type AuthConfig, type AwsV4Config, type OAuth2Config } from '@shared/model';
 import { looksLikeSecret, type SecretField } from '@shared/secrets';
 import { errorMessage, yept } from '../api';
 import { useStore } from '../store';
@@ -6,9 +6,10 @@ import { VarInput } from './VarInput';
 import { prompt } from './Dialogs';
 
 const LABELS: Record<string, string> = {
-  inherit: 'Inherit', none: 'No auth', bearer: 'Bearer token', basic: 'Basic', apikey: 'API key', oauth2: 'OAuth2 client credentials',
+  inherit: 'Inherit', none: 'No auth', bearer: 'Bearer token', basic: 'Basic', apikey: 'API key', oauth2: 'OAuth2',
   digest: 'Digest', awsv4: 'AWS Signature v4', ntlm: 'NTLM'
 };
+const GRANT_LABELS = { client_credentials: 'Client credentials', authorization_code: 'Authorization code', password: 'Password (legacy)' };
 
 interface Props {
   auth: AuthConfig;
@@ -112,10 +113,24 @@ export function AuthEditor({ auth, onChange, readOnly, allowInherit, collectionI
       )}
       {auth.mode === 'oauth2' && supported && (
         <div style={{ display: 'grid', gap: 8 }}>
+          {row('Grant type', <select className="input" value={o.grantType} disabled={readOnly} onChange={(e) => setOAuth({ grantType: e.target.value })} aria-label="OAuth2 grant type">
+            {OAUTH2_GRANTS.map((grant) => <option key={grant} value={grant}>{GRANT_LABELS[grant]}</option>)}
+          </select>)}
+          {o.grantType === OAUTH2_AUTHORIZATION_CODE && <>
+            {row('Authorization URL', <VarInput className="input mono" value={o.authorizationUrl ?? ''} readOnly={readOnly} placeholder="{{baseUrl}}/oauth/authorize" spellCheck={false} onChange={(e) => setOAuth({ authorizationUrl: e.target.value })} aria-label="Authorization URL" />)}
+            {row('Callback URL', <VarInput className="input mono" value={o.callbackUrl ?? ''} readOnly={readOnly} placeholder="Random loopback port when blank" spellCheck={false} onChange={(e) => setOAuth({ callbackUrl: e.target.value })} aria-label="Callback URL" />)}
+            <label className="check-row"><input type="checkbox" checked={o.pkce !== false} disabled={readOnly} onChange={(e) => setOAuth({ pkce: e.target.checked })} /> Use PKCE (S256)</label>
+          </>}
           {row('Token URL', <VarInput className="input mono" value={o.accessTokenUrl} readOnly={readOnly} placeholder="{{baseUrl}}/oauth/token" spellCheck={false} onChange={(e) => setOAuth({ accessTokenUrl: e.target.value })} aria-label="Token URL" />)}
+          {row('Refresh URL', <VarInput className="input mono" value={o.refreshTokenUrl ?? ''} readOnly={readOnly} placeholder="Uses the token URL when blank" spellCheck={false} onChange={(e) => setOAuth({ refreshTokenUrl: e.target.value })} aria-label="Refresh token URL" />)}
           {row('Client ID', <VarInput className="input mono" value={o.clientId} readOnly={readOnly} placeholder="{{clientId}}" spellCheck={false} onChange={(e) => setOAuth({ clientId: e.target.value })} aria-label="Client ID" />)}
-          {row('Client secret', <VarInput className="input mono" value={o.clientSecret} readOnly={readOnly} placeholder="{{clientSecret}}" spellCheck={false} onChange={(e) => setOAuth({ clientSecret: e.target.value })} aria-label="Client secret" />)}
+          {row('Client secret', <input className="input mono" type={looksLikeSecret(o.clientSecret, 'password') ? 'password' : 'text'} value={o.clientSecret} readOnly={readOnly} placeholder="{{clientSecret}}" spellCheck={false} onChange={(e) => setOAuth({ clientSecret: e.target.value })} aria-label="Client secret" />)}
           <SecretHint value={o.clientSecret} field="password" collectionId={collectionId} suggestedName="clientSecret" onReplace={(ref) => setOAuth({ clientSecret: ref })} />
+          {o.grantType === OAUTH2_PASSWORD && <>
+            {row('Username', <VarInput className="input mono" value={o.username ?? ''} readOnly={readOnly} placeholder="{{username}}" spellCheck={false} onChange={(e) => setOAuth({ username: e.target.value })} aria-label="OAuth2 username" />)}
+            {row('Password', <input className="input mono" type={looksLikeSecret(o.password ?? '', 'password') ? 'password' : 'text'} value={o.password ?? ''} readOnly={readOnly} placeholder="{{oauthPassword}}" spellCheck={false} onChange={(e) => setOAuth({ password: e.target.value })} aria-label="OAuth2 password" />)}
+            <SecretHint value={o.password ?? ''} field="password" collectionId={collectionId} suggestedName="oauthPassword" onReplace={(ref) => setOAuth({ password: ref })} />
+          </>}
           {row('Scope', <VarInput className="input mono" value={o.scope} readOnly={readOnly} placeholder="Optional, e.g. bookings.read" spellCheck={false} onChange={(e) => setOAuth({ scope: e.target.value })} aria-label="Scope" />)}
           {row(
             'Send credentials',
@@ -134,17 +149,16 @@ export function AuthEditor({ auth, onChange, readOnly, allowInherit, collectionI
           {o.tokenPlacement === 'header'
             ? row('Header prefix', <input className="input mono" value={o.tokenHeaderPrefix} readOnly={readOnly} placeholder="Bearer" spellCheck={false} onChange={(e) => setOAuth({ tokenHeaderPrefix: e.target.value })} aria-label="Token header prefix" />)
             : row('Parameter name', <input className="input mono" value={o.tokenQueryKey} readOnly={readOnly} placeholder="access_token" spellCheck={false} onChange={(e) => setOAuth({ tokenQueryKey: e.target.value })} aria-label="Token query parameter" />)}
-          <label className="check-row">
+          {o.grantType !== OAUTH2_AUTHORIZATION_CODE && <label className="check-row">
             <input type="checkbox" checked={o.autoFetchToken} disabled={readOnly} onChange={(e) => setOAuth({ autoFetchToken: e.target.checked })} />
             Get a token automatically when there is none
-          </label>
+          </label>}
           <label className="check-row">
             <input type="checkbox" checked={o.autoRefreshToken} disabled={readOnly} onChange={(e) => setOAuth({ autoRefreshToken: e.target.checked })} />
             Get a new token automatically when it expires or is rejected
           </label>
           <p className="mute small">
-            Tokens are kept in memory for each environment, never in files, and a restart gets a new one. If the server rejects a cached token with 401, a GET, HEAD or OPTIONS request is re-sent once with a new
-            token; other requests are not re-sent automatically, because they may change data.
+            Tokens are kept in memory for each environment. When automatic renewal is on, Yept tries a refresh token first and can re-send a GET, HEAD or OPTIONS request once after a 401.
           </p>
         </div>
       )}

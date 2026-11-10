@@ -283,11 +283,12 @@ export function collectionActions(collections: Collections, ready: Promise<void>
         }
       }
       // Credentials found in the source: ticked ones become {{variables}} marked secret, as in the desktop.
-      let fixIds = preview.findings.map((f) => f.id);
-      if (preview.findings.length) {
+      let fixIds: string[] = [];
+      const optionalFindings = preview.findings.filter((f) => !f.required);
+      if (optionalFindings.length) {
         const chosen = await vscode.window.showQuickPick(
-          preview.findings.map((f) => ({ label: `${f.where}: ${f.field}`, description: `${f.preview} → {{${f.variable}}}`, picked: true, id: f.id })),
-          { title: `Yept: Credentials Found (${preview.findings.length})`, placeHolder: 'Ticked values become {{variables}} marked secret, with the values stored as local secrets on this machine, not in the files.', canPickMany: true, ignoreFocusOut: true }
+          optionalFindings.map((f) => ({ label: `${f.where}: ${f.field}`, description: `${f.preview} → {{${f.variable}}}`, picked: true, id: f.id })),
+          { title: `Yept: Credentials Found (${preview.findings.length})`, placeHolder: 'OAuth2 credentials and any other ticked values are stored as local secrets.', canPickMany: true, ignoreFocusOut: true }
         );
         if (!chosen) return;
         fixIds = chosen.map((c) => c.id);

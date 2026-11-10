@@ -13,14 +13,14 @@ import type { Readable } from 'node:stream';
 import axios, { type AxiosError, type AxiosResponse } from 'axios';
 import { interpolate, utils as brunoUtils } from '@usebruno/common';
 import { caOptions } from '../net/ca';
-import { AUTH_MODES, OAUTH2_CLIENT_CREDENTIALS, type AuthConfig, type CookieUse, type ExtractionResult, type HttpMethod, type KeyValue, type NetworkHop, type OAuth2Use, type RequestDoc, type RunResult, type ScriptRequest, type ScriptStage, type SettingsDoc, type TestResult, type TimelineEntry } from '../../shared/model';
+import { AUTH_MODES, OAUTH2_AUTHORIZATION_CODE, isOAuth2Grant, type AuthConfig, type CookieUse, type ExtractionResult, type HttpMethod, type KeyValue, type NetworkHop, type OAuth2Use, type RequestDoc, type RunResult, type ScriptRequest, type ScriptStage, type SettingsDoc, type TestResult, type TimelineEntry } from '../../shared/model';
 import { findUnresolved } from '../../shared/vars';
 import { emptyEnvLayer, envVariables, resolveLayers, type VarLayers } from '../env/variables';
 import type { RawResult, SandboxHooks, SandboxHost, ScriptSendReply, SandboxRequest, SandboxResponse, SandboxResult } from '../sandbox/host';
 import type { RunCookies } from '../cookies/cookie-store';
 import { WireRecorder, type RedirectEvent, type WireHop } from './network';
 import { captureCookies } from '../cookies/exchange';
-import { TokenCache, TokenError, fetchClientCredentialsToken, isExpired, oauth2Fields, resolveOAuth2, type TokenEntry, type TokenFetcher } from '../auth/oauth2';
+import { TokenCache, TokenError, fetchOAuth2Token, isExpired, maskOAuth2Text, oauth2Fields, resolveOAuth2, type TokenEntry, type TokenFetcher } from '../auth/oauth2';
 import { cookieMetadata } from '../../shared/run-cookies';
 import { describeParts } from '../../shared/multipart';
 import { MultipartFileError, encodeMultipart, loadParts, type EncodedMultipart, type MultipartInput, type MultipartPart } from './multipart';
@@ -222,8 +222,8 @@ export function prepare(doc: RequestDoc, vars: Record<string, unknown>, auth: Au
   if (!(AUTH_MODES as readonly string[]).includes(auth.mode)) {
     throw new PrepareError(`Auth mode "${auth.mode}" isn't supported by Yept yet. Use a bearer token or set the header yourself.`);
   }
-  if (auth.mode === 'oauth2' && auth.oauth2.grantType !== OAUTH2_CLIENT_CREDENTIALS) {
-    throw new PrepareError(`OAuth2 "${auth.oauth2.grantType}" isn't supported by Yept yet: only client credentials is. Use a bearer token or set the header yourself.`);
+  if (auth.mode === 'oauth2' && !isOAuth2Grant(auth.oauth2.grantType)) {
+    throw new PrepareError(`OAuth2 "${auth.oauth2.grantType}" isn't supported by Yept yet. Use a bearer token or set the header yourself.`);
   }
   if (doc.body.unsupported) {
     throw new PrepareError(`Body type "${doc.body.unsupported}" isn't supported by Yept yet. Choose another body type in the Body tab, or send this request from Bruno.`);
@@ -521,10 +521,19 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
   let wire: WireRecorder | null = null;
   let cookieUse: CookieUse | undefined;
   let oauth2Use: OAuth2Use | undefined;
+  const oauthSecrets = new Set<string>();
+  const rememberOAuthSecrets = (...values: (string | undefined)[]): void => {
+    for (const value of values) if (value) {
+      oauthSecrets.add(value);
+      extraMask.push(value, encodeURIComponent(value), new URLSearchParams({ v: value }).toString().slice(2));
+    }
+  };
+  const maskOAuth = (s: string): string => maskOAuth2Text(s, [...oauthSecrets]);
   let cookieSource: 'jar' | 'request' = 'request';
   let cookieValues: string[] = [];
   const result = (partial: Partial<RunResult> & Pick<RunResult, 'outcome'>, request: RunResult['request']): RunResult => {
-    const mask = masker(secretValues());
+    const maskOther = masker(secretValues());
+    const mask = (s: string): string => maskOther(maskOAuth(s));
     const captured = captureCookies(wire?.hops ?? [], cookieSource);
     cookieValues = captured.map((c) => c.value);
     const maskSent = (headers: [string, string][]): [string, string][] => headers.map(([k, v]) => [k, SENT_SENSITIVE.test(k) ? '••••••' : mask(v)]);
@@ -533,17 +542,18 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
       runId: opts.runId,
       durationMs: at(),
       sizeBytes: 0,
-      headers: [],
-      body: empty,
       environment,
       scriptErrors: scriptErrors.map((e) => ({ ...e, message: mask(e.message) })),
-      extractions,
+      extractions: extractions.map((e) => ({ ...e, message: e.message === undefined ? undefined : maskOAuth(e.message) })),
       console: consoleOut.map((c) => ({ ...c, text: mask(c.text) })),
       timeline: timeline.map((t) => ({ ...t, detail: t.detail === undefined ? undefined : mask(t.detail) })),
-      tests: tests.map((t) => ({ ...t, message: t.message === undefined ? undefined : mask(t.message) })),
+      tests: tests.map((t) => ({ ...t, name: maskOAuth(t.name), message: t.message === undefined ? undefined : mask(t.message) })),
       testsState: hasTests ? 'not-run' : 'none',
       testsNote: hasTests ? 'Not run: no HTTP response' : undefined,
       ...partial,
+      headers: (partial.headers ?? []).map(([k, v]) => [k, maskOAuth(v)]),
+      body: partial.body ? { ...partial.body, text: maskOAuth(partial.body.text) } : empty,
+      error: partial.error ? { ...partial.error, message: maskOAuth(partial.error.message) } : undefined,
       requestBody: partial.requestBody === undefined ? undefined : mask(partial.requestBody),
       multipart: partial.multipart?.map((p) => ({ ...p, value: p.value === undefined ? undefined : mask(p.value), path: p.path === undefined ? undefined : mask(p.path) })),
       request: { method: request.method, url: mask(request.url), headers: maskSent(request.headers) },
@@ -590,6 +600,9 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
 
   // ---------- resolve, interpolate, validate ----------
   const vars: Record<string, unknown> = { ...resolved().values, process: { env: processEnv } };
+  const I = (s: string): string => String(interpolate(s, vars));
+  const oauthCfg = auth.mode === 'oauth2' ? resolveOAuth2(auth.oauth2, I) : null;
+  if (oauthCfg) rememberOAuthSecrets(oauthCfg.clientSecret, oauthCfg.password);
   let prepared: Prepared;
   try {
     // With OAuth2, everything is validated first, so no token is fetched for a request that can't be sent.
@@ -622,7 +635,6 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
   };
   const sentBody = (): Pick<RunResult, 'requestBody' | 'multipart'> => (parts ? { requestBody: describeParts(parts), multipart: parts } : { requestBody: prepared.data });
   withBody(prepared);
-  const I = (s: string): string => String(interpolate(s, vars));
   // Mask credentials that came from auth settings too (e.g. a Basic password typed into the request).
   for (const v of authSecrets(auth)) extraMask.push(I(v));
 
@@ -637,9 +649,8 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
   // ---------- OAuth2: a cached token, or a new one (shared with sends running at the same time) ----------
   const tokenCache = opts.oauth2?.cache ?? new TokenCache();
   const tokenScope = opts.oauth2?.scope ?? '';
-  const oauthCfg = auth.mode === 'oauth2' ? resolveOAuth2(auth.oauth2, (s) => String(interpolate(s, vars))) : null;
   // Same TLS settings as the request itself.
-  const fetchToken: TokenFetcher = (cfg) => fetchClientCredentialsToken(cfg, { httpAgent, httpsAgent, timeoutMs, userAgent: USER_AGENT });
+  const fetchToken: TokenFetcher = (cfg, previous, signal) => fetchOAuth2Token(cfg, previous, { httpAgent, httpsAgent, timeoutMs, userAgent: USER_AGENT, signal });
   const tokenFailure = (e: unknown): { outcome: RunResult['outcome']; message: string; code?: string } => {
     if (e instanceof TokenError) return { outcome: 'prepare_error', message: `OAuth2 token request failed: ${e.message}` };
     const c = classify(e);
@@ -653,12 +664,16 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
   let token: TokenEntry | undefined;
   if (oauthCfg) {
     const o = auth.oauth2;
-    extraMask.push(oauthCfg.clientSecret);
     const cached = tokenCache.peek(tokenScope, oauthCfg);
+    rememberOAuthSecrets(cached?.accessToken, cached?.refreshToken);
     let how: OAuth2Use['token'] = 'cached';
     if (cached && !isExpired(cached)) token = cached;
     else {
-      // Fetching automatically also covers renewal: client credentials has no separate refresh grant here.
+      if (oauthCfg.grantType === OAUTH2_AUTHORIZATION_CODE && !cached?.refreshToken) {
+        return notSent(tokenFailure(new TokenError('Use Get token in the Auth tab to sign in before sending this request.')));
+      }
+      // Either switch allows renewal (Bruno files often have auto fetch on and auto refresh off). With a refresh
+      // token the refresh grant is tried first; otherwise the grant runs again.
       if (!(cached ? o.autoRefreshToken || o.autoFetchToken : o.autoFetchToken)) {
         return notSent({ outcome: 'prepare_error', message: cached ? 'The OAuth2 token has expired and automatic renewal is off. Use Get token in the Auth tab.' : 'There is no OAuth2 token yet and automatic fetching is off. Use Get token in the Auth tab.' });
       }
@@ -669,7 +684,7 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
         return notSent(tokenFailure(e));
       }
     }
-    extraMask.push(token.accessToken);
+    rememberOAuthSecrets(token.accessToken, token.refreshToken);
     oauth2Use = { token: how, expiresAt: token.expiresAt === undefined ? undefined : new Date(token.expiresAt).toISOString() };
     const label = { cached: 'Cached token', fetched: `New token from ${oauthCfg.accessTokenUrl}`, renewed: `Expired token renewed from ${oauthCfg.accessTokenUrl}` }[how];
     timeline.push({ atMs: at(), label: 'OAuth2 token', detail: `${label}${token.expiresAt ? `, expires in ${expiresIn(token.expiresAt)}` : ''}` });
@@ -810,21 +825,22 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
 
   // ---------- OAuth2: a 401 for a cached token means it was revoked or expired early ----------
   // A token fetched for this run is never retried: a 401 then points at the configuration, not the token.
-  if (oauthCfg && oauth2Use?.token === 'cached' && response.status === 401 && (auth.oauth2.autoRefreshToken || auth.oauth2.autoFetchToken)) {
-    tokenCache.forget(tokenScope, oauthCfg);
+  if (oauthCfg && token && oauth2Use?.token === 'cached' && response.status === 401 && (auth.oauth2.autoRefreshToken || auth.oauth2.autoFetchToken)) {
+    tokenCache.invalidate(tokenScope, oauthCfg, token);
     if (!SAFE_METHODS.has(prepared.method)) {
       oauth2Use.note = `The server rejected the cached OAuth2 token (401), so it was discarded. ${prepared.method} requests aren't re-sent automatically because they may change data: send again to use a new token.`;
       timeline.push({ atMs: at(), label: 'OAuth2 token rejected', detail: 'Discarded; not re-sent automatically' });
     } else {
       let fresh: TokenEntry | undefined;
       try {
-        fresh = await tokenCache.fetch(tokenScope, oauthCfg, fetchToken, ac.signal);
+        const latest = tokenCache.peek(tokenScope, oauthCfg);
+        fresh = latest && latest !== token && !isExpired(latest) ? latest : await tokenCache.fetch(tokenScope, oauthCfg, fetchToken, ac.signal);
       } catch (e) {
         oauth2Use.note = `The server rejected the cached OAuth2 token (401), and a new one couldn't be fetched. ${tokenFailure(e).message}`;
         timeline.push({ atMs: at(), label: 'OAuth2 token rejected', detail: 'A new token could not be fetched' });
       }
       if (fresh) {
-        extraMask.push(fresh.accessToken);
+        rememberOAuthSecrets(fresh.accessToken, fresh.refreshToken);
         response.data.destroy();
         prepared = withBody(prepare(working, vars, auth, fresh.accessToken));
         addStoredCookies(prepared);

@@ -23,6 +23,8 @@ export function requestDoc(value: unknown): asserts value is RequestDoc {
   if (!strings(a, ['mode']) || !strings(a.bearer, ['token']) || !strings(a.basic, ['username', 'password']) || !strings(a.apikey, ['key', 'value', 'placement']) || !['header', 'queryparams'].includes(a.apikey.placement)) fail();
   const o = a.oauth2;
   if (!strings(o, ['grantType', 'accessTokenUrl', 'clientId', 'clientSecret', 'scope', 'credentialsPlacement', 'tokenPlacement', 'tokenHeaderPrefix', 'tokenQueryKey']) || !['basic_auth_header', 'body'].includes(o.credentialsPlacement) || !['header', 'url'].includes(o.tokenPlacement) || typeof o.autoFetchToken !== 'boolean' || typeof o.autoRefreshToken !== 'boolean') fail();
+  if (['authorizationUrl', 'callbackUrl', 'refreshTokenUrl', 'username', 'password'].some((key) => o[key] !== undefined && typeof o[key] !== 'string') ||
+      (o.pkce !== undefined && typeof o.pkce !== 'boolean')) fail();
   const s = d.settings;
   if (!object(s) || !['encodeUrl', 'followRedirects', 'forwardAuthorizationHeader', 'sendCookies'].every((k) => typeof s[k] === 'boolean') || !['timeoutMs', 'maxRedirects'].every((k) => Number.isSafeInteger(s[k]) && s[k] >= 0)) fail();
 }

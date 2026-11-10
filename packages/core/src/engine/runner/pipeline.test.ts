@@ -126,10 +126,16 @@ describe('login, token extraction and inherited auth', () => {
     expect(r.result.error?.message).toMatch(/wsse.*isn't supported/);
   });
 
-  it('OAuth2 flows other than client credentials stop with a clear message', async () => {
-    const r = await run(doc({ auth: { ...noAuth, mode: 'oauth2', oauth2: { ...noAuth.oauth2, grantType: 'authorization_code' } } }), opts({ layers: env() }));
+  it('unsupported OAuth2 grants stop with a clear message', async () => {
+    const r = await run(doc({ auth: { ...noAuth, mode: 'oauth2', oauth2: { ...noAuth.oauth2, grantType: 'implicit' } } }), opts({ layers: env() }));
     expect(r.result.outcome).toBe('prepare_error');
-    expect(r.result.error?.message).toMatch(/OAuth2 "authorization_code" isn't supported.*only client credentials/);
+    expect(r.result.error?.message).toMatch(/OAuth2 "implicit" isn't supported/);
+  });
+
+  it('an authorization code grant without a token asks to sign in first', async () => {
+    const r = await run(doc({ auth: { ...noAuth, mode: 'oauth2', oauth2: { ...noAuth.oauth2, grantType: 'authorization_code', accessTokenUrl: '{{baseUrl}}/auth/token', authorizationUrl: '{{baseUrl}}/auth/authorize', clientId: 'c' } } }), opts({ layers: env() }));
+    expect(r.result.outcome).toBe('prepare_error');
+    expect(r.result.error?.message).toMatch(/Use Get token in the Auth tab to sign in/);
   });
 });
 

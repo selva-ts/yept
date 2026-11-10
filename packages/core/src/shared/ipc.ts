@@ -138,8 +138,9 @@ export interface AppMetrics {
   mainHeapBytes: number;
 }
 
-/** The OAuth2 token for a request's effective auth. `applies` is false when that auth isn't OAuth2 client credentials. */
+/** The OAuth2 token for a request's effective auth. */
 export type OAuth2TokenView = { applies: false } | { applies: true; environment: string; status: OAuth2TokenStatus };
+export type OAuth2TokenAction = 'status' | 'fetch' | 'forget' | 'cancel';
 
 export interface YeptApi {
   versions: () => Promise<Record<string, string>>;
@@ -284,7 +285,7 @@ export interface YeptApi {
 
   oauth2: {
     /** Status of the token for the draft's effective auth in the active environment; 'fetch' gets a new one, 'forget' drops it. */
-    token: (requestId: string, doc: RequestDoc, action: 'status' | 'fetch' | 'forget') => Promise<OAuth2TokenView>;
+    token: (requestId: string, doc: RequestDoc, action: OAuth2TokenAction) => Promise<OAuth2TokenView>;
   };
 
   cookies: {

@@ -133,6 +133,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
     }, {
       cipher,
       trash: moveToTrash,
+      openAuthorizationUrl: async (url) => {
+        if (!await vscode.env.openExternal(vscode.Uri.parse(url, true))) throw new Error('Could not open browser');
+      },
       openDialog: async (options) => {
         const uris = await vscode.window.showOpenDialog({
           title: options.title,

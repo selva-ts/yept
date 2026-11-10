@@ -13,7 +13,7 @@ import { GitService } from './git-service';
 import { ImportService } from '@yept/core/services/import-service';
 import { CookieService } from '@yept/core/services/cookie-service';
 import { mediaBytes } from '@yept/core/services/media-bytes';
-import type { AppMetrics, MutationResult } from '@yept/core/shared/ipc';
+import type { AppMetrics, MutationResult, OAuth2TokenAction } from '@yept/core/shared/ipc';
 import { APPEARANCE_KEYS, type Appearance, type AppSettings, type CookieView, type Environment, type GitFile, type RequestDoc, type SettingsDoc, type TlsSettings } from '@yept/core/shared/model';
 
 export function createHandlers(host: AppHost): { handlers: HandlerRegistry; close: () => Promise<void>; settings: () => AppSettings } {
@@ -96,7 +96,10 @@ export function createHandlers(host: AppHost): { handlers: HandlerRegistry; clos
   handle('runner:cancel', (runnerId: string) => runner.cancel(runnerId));
   handle('runner:pick-data-file', () => runner.pickDataFile());
   handle('runner:export-report', (runnerId: string, format: unknown) => runner.exportReport(runnerId, format === 'html' ? 'html' : 'junit'));
-  handle('oauth2:token', async (requestId: string, doc: RequestDoc, action: 'status' | 'fetch' | 'forget') => runs.oauth2Token(await ws().requestContext(requestId), doc, action));
+  handle('oauth2:token', async (requestId: string, doc: RequestDoc, action: OAuth2TokenAction) => {
+    if (!['status', 'fetch', 'forget', 'cancel'].includes(action)) throw new Error('Invalid token action');
+    return runs.oauth2Token(requestId, await ws().requestContext(requestId), doc, action);
+  });
 
   handle('history:list', (requestId: string) => runs.history.list(requestId));
   handle('history:get', (runId: string) => {

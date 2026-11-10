@@ -25,6 +25,7 @@ export function createDesktopHost(getWindow: () => BrowserWindow | null, appeara
     },
     trash: (path) => shell.trashItem(path),
     openExternal: (url) => { openExternalUrl(url, (safe) => shell.openExternal(safe)); },
+    openAuthorizationUrl: (url) => shell.openExternal(url),
     writeClipboard: (text) => clipboard.writeText(text),
     cipher: safeCipher,
     applyAppearance: (appearance) => {
