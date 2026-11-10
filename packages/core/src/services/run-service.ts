@@ -14,7 +14,8 @@ import { OAUTH2_CLIENT_CREDENTIALS, type RequestDoc, type RunResult } from '@yep
 import type { EnvService } from './env-service';
 import type { SettingsService } from './settings-service';
 import type { CookieService } from './cookie-service';
-import { toCurl, type CurlRequest } from '@yept/core/shared/curl';
+import type { CurlRequest } from '@yept/core/shared/curl';
+import { isSnippetLanguage, toSnippet } from '@yept/core/shared/snippets';
 import { rawRequestHead } from '@yept/core/shared/raw-http';
 import type { AppHost } from './host';
 import { RecentCookies } from './recent-cookies';
@@ -167,8 +168,10 @@ export class RunService {
     return this.bodies.get(runId) ?? this.historyStore?.body(runId);
   }
 
-  curlWithSecrets(runId: string): string {
-    return toCurl(this.unmasked(runId));
+  /** The request as cURL, or as code in another language, with secret values and cookies. */
+  curlWithSecrets(runId: string, language: unknown = 'curl'): string {
+    if (!isSnippetLanguage(language)) throw new Error(`Unknown language: ${String(language)}`);
+    return toSnippet(language, this.unmasked(runId));
   }
 
   /** The raw request head of the last request on the wire, with secret values and cookies. */

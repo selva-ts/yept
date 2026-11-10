@@ -96,6 +96,13 @@ it('tells Dev Tools when a panel send starts and ends, with the active environme
   // Copies with secrets are kept for runs of this session.
   expect(await services.handlers.invoke('runs:curl-with-secrets', runId)).toContain(Buffer.from('sample-client:sample-secret').toString('base64'));
   expect(await services.handlers.invoke('runs:raw-with-secrets', runId)).toMatch(/^POST \/auth\/token/);
+  // The same, as code in another language.
+  const basic = Buffer.from('sample-client:sample-secret').toString('base64');
+  const python = await services.handlers.invoke('runs:curl-with-secrets', runId, 'python') as string;
+  expect(python.startsWith('import requests')).toBe(true);
+  expect(python).toContain(basic);
+  expect(await services.handlers.invoke('runs:curl-with-secrets', runId, 'csharp')).toContain(basic);
+  await expect(services.handlers.invoke('runs:curl-with-secrets', runId, 'ruby')).rejects.toThrow('Unknown language');
   await expect(services.handlers.invoke('runs:curl-with-secrets', 'unknown')).rejects.toThrow('last 50 requests');
 });
 

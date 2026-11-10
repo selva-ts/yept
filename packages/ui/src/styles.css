@@ -654,6 +654,11 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line); border-bottom-width
 .devtools-resize:hover, .devtools-resize.dragging { background: var(--line); }
 .devtools-tabs { flex: none; align-items: center; }
 .dt-actions { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+.dt-menu-backdrop { position: fixed; inset: 0; z-index: 59; }
+.menu.dt-copy-menu { max-height: calc(100vh - 16px); overflow-y: auto; }
+.menu.dt-copy-menu button { display: flex; align-items: center; gap: 6px; }
+.menu.dt-copy-menu .menu-check { font-size: 11px; }
+.menu.dt-copy-menu button:disabled { color: var(--mute); opacity: .55; cursor: default; background: none; }
 .dt-raw { font-size: var(--code-size, 12px); white-space: pre; overflow-x: auto; }
 .dt-raw-note { margin: 0 0 6px; }
 .dt-raw-actions { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
