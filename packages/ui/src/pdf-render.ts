@@ -16,7 +16,9 @@ export interface RenderedPdf {
 }
 
 export async function renderPdf(bytes: Uint8Array): Promise<RenderedPdf> {
-  const worker = new PDFWorker({ port: new PdfWorker() as never });
+  // pdf.js doesn't stop a worker it was given, so it is terminated below.
+  const port = new PdfWorker();
+  const worker = new PDFWorker({ port: port as never });
   const task = getDocument({
     data: bytes,
     worker,
@@ -47,5 +49,6 @@ export async function renderPdf(bytes: Uint8Array): Promise<RenderedPdf> {
   } finally {
     await task.destroy();
     worker.destroy();
+    port.terminate();
   }
 }

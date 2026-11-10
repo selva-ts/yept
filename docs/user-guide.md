@@ -50,7 +50,24 @@ The response **Body** shows **Pretty** (formatted, with highlighting) or **Raw**
 
 An HTML response also has **Preview**, which shows the page as a browser would draw it, but safely: its scripts don't run, links and forms do nothing, and nothing is loaded from the server or anywhere else. So the page's own inline styles apply, but images and stylesheets that it links to are missing. This is meant for error pages and simple HTML from an API, not for browsing a site. Pretty, Raw or Preview stays chosen for that tab while you keep sending, and **Copy** always copies the body as received when Preview is on.
 
+### Filter, save and preview a response
+
+Above a JSON body in **Pretty** there is a **Filter** box that takes JSONPath: `$.items[*].id`, `$..price`, `$.items[0]`, `$.items[-1]`, `$.items[1:3]`, `$['x-request-id']`, or a filter such as `$.items[?(@.price < 10 && @.status == 'open')]`. The leading `$` is optional. The body is replaced by the matching values while the filter is on, and **Copy** copies them. A mistake in the expression shows a message beside the box and leaves the body as it is. Clear the box, or press **Esc**, to return to the whole body. A filter that matches a huge number of values shows the first 10,000.
+
+**Set as variable…** saves a value from the response into the collection's active environment. It takes the value you selected in the body (also on the editor's right-click menu), or else the one value the filter matches. Choose a name and where it goes:
+
+- **Runtime variable**: kept for this session only, like a value a post-response variable extracts. Use it as `{{name}}` in the next requests.
+- **Local secret**: for tokens and keys. The environment file only declares the name as a secret; the value is encrypted on this machine and shown masked, as other secrets are. A name such as `token`, `secret` or `apiKey` picks this by default.
+
+The dialog shows the variable name used and, for a secret, hides the value. Choose an environment first; without one there is nowhere to keep the value.
+
+**Save to file…** writes the body exactly as received, byte for byte, so images, PDFs and archives open as they should. The suggested name comes from the response's `Content-Disposition` header, else the last part of the URL, else the request name. For a run opened from history, the stored body is saved, which is redacted and may be cut short by the history body limit.
+
+An image (`image/png`, `jpeg`, `gif`, `webp`, `avif`, `bmp`, `svg+xml`, `x-icon`) or a PDF opens in **Preview**, drawn from the bytes received, in the same sandboxed frame as the HTML preview: no scripts, nothing loaded from the network. PDF pages are drawn as pictures (the first 30 pages), so their links and forms don't work, and fonts the PDF doesn't embed use system fonts. A body that was cut short, or is larger than 20 MB, is not previewed; save it to a file instead. **Pretty** and **Raw** are still there for a PDF that is mostly text, or an SVG.
+
 The response pane's history list keeps up to 20 runs per request by default and survives a restart. Select a past run to see its **original** response and test results; Yept does not resend it. **Restore request** copies the old request into the editor for review, without saving. Add simple checks in the **Tests** tab, or a JavaScript `test(...)` script. Results distinguish passed, failed and script error. The Settings dialog controls history limits and shows orphaned runs after external file moves. History export may contain response data even after known secrets are redacted, so review it before sharing.
+
+To compare two runs, open **History**, click **Compare** and pick two runs. Status, time, size, environment, URL and tests are listed side by side with the changed rows marked, and **Headers** and **Body** open in a diff view (JSON bodies are formatted first, so spacing doesn't count as a change; headers are sorted by name). Only what history stored is compared: secrets show as `«secret:name»` and auth and cookie headers as `«redacted»`, as the view says. Pick another run to change the pair, or **Close comparison**.
 
 ### Run a folder or a whole collection
 

@@ -15,7 +15,8 @@ The application is MIT licensed, needs no Yept account and has no telemetry. Col
 - Use environments and encrypted local secrets, bearer/basic/API-key auth, and OAuth2 client credentials with token caching.
 - Run pre/post-request scripts, assertions and a sequential collection runner. Unresolved variables block sending.
 - Inspect redirect hops, sent headers, timings, TLS details, cookies, reconstructed raw HTTP and masked cURL exports in Dev tools.
-- Keep response history with redaction before storage, and follow requests across renames.
+- Keep response history with redaction before storage, and follow requests across renames. Compare two stored runs side by side.
+- Filter JSON responses with JSONPath, set a value as a variable or local secret, save bodies to a file as received, and preview HTML, images and PDFs in a sandboxed frame.
 - Review diffs, stage files, commit selected changes, push, fetch and pull with the desktop Git panel. A leak check flags common credential patterns.
 - Import Postman, Insomnia, OpenAPI and Bruno files; export a bundled OpenCollection file. Paste a curl command to create a request.
 - Choose light/dark mode, themes and installed fonts.

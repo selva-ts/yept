@@ -11,6 +11,7 @@ The first preview of Yept for VS Code. It uses the same request engine and colle
 - **Environments:** the active environment is in the status bar. **Manage Environments** edits shared values (saved to the collection), and local overrides, secrets and TLS settings (kept on this machine).
 - **Secrets and cookies:** local secrets and automatic cookies are encrypted under a key in VS Code's secret storage.
 - **History:** local response history, with secrets redacted, in a History view that follows the active request. Open a past run, or restore it into the editor.
+- **Response tools:** JSONPath filter, set as variable (runtime or local secret), save body to a file with VS Code's save dialog, image and PDF preview, and comparing two stored runs.
 - **Collection runner:** runs a collection or folder in order, with the environment you choose and an option to stop at the first failure.
 - **Dev Tools:** Console, Network and Cookies tabs in the bottom panel, for every send.
 - **Import and export:** import Postman, Insomnia, OpenAPI, OpenCollection and Bruno collections, with a preview and credential handling. Export to OpenCollection YAML without secret values.
