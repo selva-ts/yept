@@ -1,6 +1,6 @@
 // Collection runner rules: tree order, how a result is judged, and how steps and tests are counted.
 import { describe, expect, it } from 'vitest';
-import { finishedStep, judge, pendingStep, planRun, summarize } from './collection-run';
+import { cleanRunnerOptions, finishedStep, groupByIteration, judge, MAX_DELAY_MS, MAX_ITERATIONS, pendingStep, plannedSteps, planRun, summarize } from './collection-run';
 import type { RunResult, TestResult, TreeNode } from './model';
 
 const req = (name: string, method: TreeNode['method'] = 'GET'): TreeNode => ({ id: `id:${name}`, kind: 'request', name, path: `c/${name}.yml`, method });
@@ -99,5 +99,35 @@ describe('summarize', () => {
     const child = result({ runId: 'a.1', testsState: 'ran', tests: [test('failed')] });
     const step = finishedStep(pendingStep(planRun(folder('F', [req('A')]))[0]), result({ runId: 'a', testsState: 'ran', tests: [test('passed')], scriptRequests: [{ stage: 'pre-request', startedAt: 0, result: child }] }));
     expect(summarize([step])).toMatchObject({ total: 1, passed: 1, tests: { passed: 1, failed: 0, errors: 0 } });
+  });
+});
+
+describe('iterations', () => {
+  const plan = planRun(folder('F', [req('A'), req('B')]));
+
+  it('plans every request once per iteration', () => {
+    expect(plannedSteps(plan, 3).map((s) => `${s.iteration}${s.name}`)).toEqual(['1A', '1B', '2A', '2B', '3A', '3B']);
+    expect(plannedSteps(plan).map((s) => s.iteration)).toEqual([1, 1]);
+  });
+
+  it('groups a run by iteration with its own counts', () => {
+    const steps = plannedSteps(plan, 2);
+    steps[0] = finishedStep(steps[0], result({ runId: 'a', testsState: 'ran', tests: [test('passed')] }));
+    steps[1] = finishedStep(steps[1], result({ runId: 'b', status: 500 }));
+    steps[2] = { ...steps[2], status: 'running' };
+    const groups = groupByIteration(steps);
+    expect(groups.map((g) => [g.iteration, g.start, g.steps.length, g.done])).toEqual([[1, 0, 2, true], [2, 2, 2, false]]);
+    expect(groups[0].summary).toMatchObject({ passed: 1, failed: 1 });
+  });
+});
+
+describe('cleanRunnerOptions', () => {
+  it('keeps good values and clamps the rest', () => {
+    expect(cleanRunnerOptions({ environment: 'dev', stopOnFailure: 1, dataFile: 'C:/data/users.csv', iterations: 3.4, delayMs: 250 }))
+      .toEqual({ environment: 'dev', stopOnFailure: true, dataFile: 'C:/data/users.csv', iterations: 3, delayMs: 250 });
+    expect(cleanRunnerOptions({ iterations: 0, delayMs: -5 })).toMatchObject({ iterations: 1, delayMs: 0 });
+    expect(cleanRunnerOptions({ iterations: 1e9, delayMs: 1e9 })).toMatchObject({ iterations: MAX_ITERATIONS, delayMs: MAX_DELAY_MS });
+    expect(cleanRunnerOptions(null)).toEqual({ environment: null, stopOnFailure: false, dataFile: null, iterations: 1, delayMs: 0 });
+    expect(cleanRunnerOptions({ environment: 5, dataFile: '', iterations: 'many', delayMs: Number.NaN })).toEqual({ environment: null, stopOnFailure: false, dataFile: null, iterations: 1, delayMs: 0 });
   });
 });

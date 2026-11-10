@@ -7,6 +7,7 @@ import { SettingsService } from '@yept/core/services/settings-service';
 import { CookieService } from '@yept/core/services/cookie-service';
 import { RunService } from '@yept/core/services/run-service';
 import { CollectionRunService } from '@yept/core/services/collection-run-service';
+import { cleanRunnerOptions } from '@yept/core/shared/collection-run';
 import { ImportService } from '@yept/core/services/import-service';
 import type { DevToolsRunEvent } from '@yept/core/shared/ipc';
 import { CookieStore } from '@yept/core/engine/cookies/cookie-store';
@@ -86,7 +87,7 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
   const cookies = new CookieService(ws, env, settings, host, stores.cookies);
   const runs = new RunService(env, settings, cookies, host, stores.history, { scriptsBlocked: hooks.scriptsBlocked });
   // Runner progress goes to every page; results are cut to what Dev Tools shows.
-  const runner = new CollectionRunService(ws, runs, (e) => host.emit('runner:event', e.type === 'step-end' && e.result ? { ...e, result: devToolsResult(e.result) } : e));
+  const runner = new CollectionRunService(ws, runs, (e) => host.emit('runner:event', e.type === 'step-end' && e.result ? { ...e, result: devToolsResult(e.result) } : e), host);
   // Import and export run from the extension's commands, not from a page.
   const importer = new ImportService(ws, env, host);
   const handlers = new HandlerRegistry();
@@ -271,7 +272,7 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
     text(runnerId);
     text(nodeId);
     try {
-      return await runner.start(runnerId, nodeId, { environment: typeof options?.environment === 'string' ? options.environment : null, stopOnFailure: !!options?.stopOnFailure });
+      return await runner.start(runnerId, nodeId, cleanRunnerOptions(options));
     } finally {
       // Each request is in history, and extracted tokens, script variables and cookies may have changed.
       hooks.onHistoryChange?.();
@@ -281,6 +282,13 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
   handle('runner:cancel', 1, (runnerId) => {
     text(runnerId);
     runner.cancel(runnerId);
+  });
+  // A data file is read on the extension's side, from a file chosen in VS Code's open dialog; the page gets its summary.
+  handle('runner:pick-data-file', 0, () => runner.pickDataFile());
+  handle('runner:export-report', 2, (runnerId, format) => {
+    text(runnerId);
+    if (format !== 'junit' && format !== 'html') throw new Error('Invalid report format');
+    return runner.exportReport(runnerId, format);
   });
 
   handle('cookies:list', 1, (id) => cookies.view(collection(id)));

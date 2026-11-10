@@ -72,6 +72,8 @@ const CHANNELS: [string, string, number][] = [
   ['runs.cookieValue', 'runs:cookie-value', 2],
   ['runner.start', 'runner:start', 3],
   ['runner.cancel', 'runner:cancel', 1],
+  ['runner.pickDataFile', 'runner:pick-data-file', 0],
+  ['runner.exportReport', 'runner:export-report', 2],
   ['oauth2.token', 'oauth2:token', 3],
   ['cookies.list', 'cookies:list', 1],
   ['cookies.upsert', 'cookies:upsert', 3],

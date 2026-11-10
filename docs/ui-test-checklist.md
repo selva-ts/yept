@@ -178,6 +178,13 @@ For the installed build, run `dist\Yept-Setup-0.9.0.exe` instead of `npm run dev
 | Edit a request without saving, then run its folder | The runner says one request has unsaved edits; the saved version is sent | |
 | After a run: Dev tools Network and each request's history | One row and one history entry per request; script requests linked to the request that sent them | |
 | Narrow window, dark mode, each theme, keyboard only (Tab, Space on the checkbox, Esc) | The table wraps without overlapping; result colours readable; Esc closes | |
+| **Choose CSV or JSON…** with a CSV saved from Excel as *CSV UTF-8* with names like München or சென்னை | Rows and variables counted; the values arrive intact (check in Dev tools) | |
+| A CSV with a bad row (more values than the header, an unclosed quote), a JSON object instead of an array, a file in ANSI encoding | A message names the line or the problem; nothing runs | |
+| Data file chosen, then **Remove**; switch to another collection | Iterations go back to the repeat count; another collection doesn't keep the file | |
+| Iterations 200 with a delay of 0 against a fast endpoint | The runner and the app stay responsive; passed iterations stay closed; the footer counts up | |
+| Delay 5000, **Cancel run** during the wait | The run ends at once; the rest show *Not run* | |
+| **JUnit XML…** and **HTML report…** after a run with secrets (basic auth, a secret in a URL) | Save dialog on top of the app (VS Code: its own save dialog); the files show «redacted» and «secret:…», never the values; the HTML opens in a browser offline, in light and dark mode | |
+| The same in the VS Code extension's runner panel | Data file, iterations, delay and both exports work as on the desktop | |
 
 ## Reporting
 

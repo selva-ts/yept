@@ -60,7 +60,18 @@ useStore.setState({ snapshot: context.snapshot });
 createRoot(document.getElementById('root')!).render(<Page unsaved={context.unsavedRequestIds} />);
 yept.workspace.onExternalChange((e) => void useStore.getState().applyExternal(e));
 onHostEvent('runner:open', (e) => void show(e.nodeId));
-useRunner.subscribe(report);
-useStore.subscribe((s, previous) => { if (s.snapshot !== previous.snapshot) report(); });
+// A long run changes the page often; the extension hears at most a few times a second, and always when a run ends.
+let reportTimer: ReturnType<typeof setTimeout> | undefined;
+const reportSoon = (): void => {
+  const run = useRunner.getState().run;
+  if (!run?.running) {
+    clearTimeout(reportTimer);
+    reportTimer = undefined;
+    return report();
+  }
+  reportTimer ??= setTimeout(() => { reportTimer = undefined; report(); }, 250);
+};
+useRunner.subscribe(reportSoon);
+useStore.subscribe((s, previous) => { if (s.snapshot !== previous.snapshot) reportSoon(); });
 await show(nodeId);
 report();

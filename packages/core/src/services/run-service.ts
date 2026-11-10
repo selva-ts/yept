@@ -9,6 +9,7 @@ import { resolveLayers } from '@yept/core/engine/env/variables';
 import type { OAuth2TokenView } from '@yept/core/shared/ipc';
 import { SandboxHost } from '@yept/core/engine/sandbox/host';
 import { HistoryStore } from '@yept/core/engine/history/store';
+import { redactResult } from '@yept/core/engine/history/redact';
 import type { RequestContext } from '@yept/core/engine/workspace/workspace';
 import { OAUTH2_CLIENT_CREDENTIALS, type RequestDoc, type RunResult } from '@yept/core/shared/model';
 import type { EnvService } from './env-service';
@@ -46,6 +47,24 @@ export interface StartOptions {
   signal?: AbortSignal;
   /** Without an environment nothing is kept between runs, except in this. */
   scratch?: RunScratch;
+  /**
+   * A data file row: runtime variables for this request only, over everything else. Afterwards each one goes back to
+   * what it was, unless a script changed it.
+   */
+  data?: Record<string, string>;
+  /** Gets the result redacted as history stores it (secrets and credential headers masked), for run reports. */
+  onRedacted?: (result: RunResult) => void;
+}
+
+/** Runtime updates with a data row's values taken back out (see StartOptions.data). */
+export function withoutData(runtime: Record<string, string>, data: Record<string, string>, before: Record<string, string>): Record<string, string> {
+  const out = { ...runtime };
+  for (const [name, value] of Object.entries(data)) {
+    if (out[name] !== value) continue; // a script set it: keep that
+    if (name in before) out[name] = before[name];
+    else delete out[name];
+  }
+  return out;
 }
 
 export interface RunServiceOptions {
@@ -96,6 +115,8 @@ export class RunService {
         e.layers.runtime = { ...scratch.runtime };
         e.layers.environment.session = { ...scratch.session };
       }
+      const before = { ...e.layers.runtime };
+      if (options.data) e.layers.runtime = { ...e.layers.runtime, ...options.data };
       const out = await run(doc, {
         runId,
         environment: e.environment,
@@ -114,6 +135,8 @@ export class RunService {
         cookies: this.cookies.forRun(ctx.collectionDir, e.environment),
         oauth2: { cache: this.tokens, scope: tokenScope(ctx.collectionDir, e.environment) }
       });
+      if (options.data) out.updates.runtime = withoutData(out.updates.runtime, options.data, before);
+      options.onRedacted?.(redactResult(out.result, out.secrets));
       this.env.apply(ctx.collectionDir, e.environment, out.updates);
       if (scratch) {
         scratch.runtime = out.updates.runtime;
