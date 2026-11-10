@@ -113,6 +113,24 @@ try {
   const full = await clipboard();
   check('Copy as cURL with secrets includes the cookies', full.includes('sid=abc123'));
 
+  // 5a. Copy as another language: masked by default, with secrets only when ticked in the menu.
+  const copyAs = async (language, withSecrets = false) => {
+    await page.getByRole('button', { name: 'Copy as', exact: true }).click();
+    const menu = page.getByRole('menu', { name: 'Copy as' });
+    if (withSecrets) await menu.getByRole('menuitemcheckbox', { name: 'Include secrets and cookies' }).click();
+    if (language === 'C# HttpClient' && !withSecrets) await shot('03b-copy-as');
+    await menu.getByRole('menuitem', { name: language }).click();
+    await page.waitForTimeout(200);
+    return clipboard();
+  };
+  const csharp = await copyAs('C# HttpClient');
+  check('Copy as C# keeps secrets masked', csharp.includes('new HttpRequestMessage(new HttpMethod("GET")') && csharp.includes('"Cookie", "••••••"') && !csharp.includes('abc123'), csharp.split('\n').find((l) => l.includes('Cookie')));
+  check('Copy as C# with secrets includes the cookies', (await copyAs('C# HttpClient', true)).includes('sid=abc123'));
+  const powershell = await copyAs('PowerShell');
+  check('Copy as PowerShell keeps secrets masked', powershell.includes('Invoke-RestMethod @params') && powershell.includes("'Cookie' = '••••••'") && !powershell.includes('abc123'), powershell.split('\n').find((l) => l.includes('Cookie')));
+  check('Copy as PowerShell with secrets includes the cookies', (await copyAs('PowerShell', true)).includes('sid=abc123'));
+  check('the secrets tick does not stay on', !(await copyAs('Python requests')).includes('abc123'));
+
   // 5b. Raw HTTP view: request and response heads as text, masked and labelled as reconstructed.
   await page.locator('.dt-details').getByRole('tab', { name: 'Request' }).click();
   await page.locator('.dt-details').getByRole('button', { name: 'Raw', exact: true }).click();

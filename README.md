@@ -13,8 +13,8 @@ The application is MIT licensed, needs no Yept account and has no telemetry. Col
 
 - Edit requests with headers, query parameters, JSON, text, XML, URL-encoded forms and multipart file uploads.
 - Use environments and encrypted local secrets, bearer/basic/API-key auth, and OAuth2 client credentials with token caching.
-- Run pre/post-request scripts, assertions and a sequential collection runner. Unresolved variables block sending.
-- Inspect redirect hops, sent headers, timings, TLS details, cookies, reconstructed raw HTTP and masked cURL exports in Dev tools.
+- Run pre/post-request scripts, assertions and a sequential collection runner, with CSV or JSON data files, repeat counts, a delay between requests, and JUnit or HTML reports. Unresolved variables block sending.
+- Inspect redirect hops, sent headers, timings, TLS details, cookies, reconstructed raw HTTP in Dev tools. Copy a request as cURL, C# `HttpClient`, PowerShell `Invoke-RestMethod`, JavaScript `fetch` or axios, or Python `requests`, with secrets masked unless you ask for them.
 - Keep response history with redaction before storage, and follow requests across renames. Compare two stored runs side by side.
 - Filter JSON responses with JSONPath, set a value as a variable or local secret, save bodies to a file as received, and preview HTML, images and PDFs in a sandboxed frame.
 - Review diffs, stage files, commit selected changes, push, fetch and pull with the desktop Git panel. A leak check flags common credential patterns.
@@ -25,7 +25,7 @@ The application is MIT licensed, needs no Yept account and has no telemetry. Col
 
 ![A synthetic request and response with network diagnostics in Yept](docs/images/request-diagnostics.png)
 
-Screenshots use an isolated profile and synthetic fixtures. See the [user guide](docs/user-guide.md) for the interface and keyboard shortcuts.
+Screenshots use an isolated profile and synthetic fixtures. See the [user guide](docs/user-guide.md) for the interface and keyboard shortcuts. To run the same requests and tests in CI with Bruno's CLI, see [running collections in CI](docs/ci.md).
 
 ## Downloads and platform status
 
@@ -109,7 +109,7 @@ The [desktop validation workflow](.github/workflows/ci.yml) checks pull requests
 
 - HTTP request workflows only: no dedicated WebSocket, gRPC or MQTT client, CLI runner or cloud collaboration service.
 - OAuth2 client credentials only; no authorization-code/PKCE, password/implicit flows or refresh-token flow.
-- Collection runs are sequential, with no data files, iterations, schedules, parallel runs or report export.
+- Collection runs are sequential, at most 1,000 iterations, with no schedules or parallel runs. Data files are CSV or JSON up to 5 MB.
 - Bruno compatibility is limited to the supported file fields and script APIs. `.bru` collections open read-only and can be converted to YAML. Unsupported body types are retained when editing other fields but cannot be sent until changed to a supported type. `bru.runRequest` and multipart file sends through `bru.sendRequest` are unavailable.
 - Scripts have a five-second execution limit. `bru.sendRequest` shares that limit and permits at most ten requests per script.
 - The Git panel does not resolve merges, rebase, stash or force-push. Use your normal Git tool for those operations.

@@ -91,14 +91,16 @@ export function createApi(invoke: Invoke, subscribe: Subscribe): YeptApi {
       cancel: (runId) => invoke('runs:cancel', runId),
       saveBody: (runId, name) => invoke('runs:save-body', runId, name),
       bodyBytes: (runId) => invoke('runs:body-bytes', runId),
-      curlWithSecrets: (runId) => invoke('runs:curl-with-secrets', runId),
+      curlWithSecrets: (runId, language) => invoke('runs:curl-with-secrets', runId, language),
       rawWithSecrets: (runId) => invoke('runs:raw-with-secrets', runId),
       cookieValue: (runId, index) => invoke('runs:cookie-value', runId, index)
     },
     runner: {
       start: (runnerId, nodeId, options) => invoke('runner:start', runnerId, nodeId, options),
       cancel: (runnerId) => invoke('runner:cancel', runnerId),
-      onEvent: (cb) => subscribe('runner:event', cb)
+      onEvent: (cb) => subscribe('runner:event', cb),
+      pickDataFile: () => invoke('runner:pick-data-file'),
+      exportReport: (runnerId, format) => invoke('runner:export-report', runnerId, format)
     },
     oauth2: {
       token: (requestId, doc, action) => invoke('oauth2:token', requestId, doc, action)

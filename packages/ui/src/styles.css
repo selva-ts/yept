@@ -586,6 +586,14 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line); border-bottom-width
 .runner-setup { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin: 4px 0 8px; }
 .runner-setup .spacer { flex: 1; }
 .runner-help { margin: 0 0 10px; line-height: 1.45; }
+.runner-repeat { gap: 8px 18px; }
+.runner-number { width: 90px; flex: none !important; }
+.runner-data { gap: 8px; min-width: 0; }
+.runner-data-name { font-family: var(--mono); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.runner-export { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 2px; }
+.runner-iteration { cursor: pointer; }
+.runner-iteration td { background: var(--panel-2); border-bottom: 1px solid var(--line); }
+.runner-iteration:hover td { background: var(--sel); }
 .runner-summary { display: grid; gap: 4px; padding: 10px 12px; margin-bottom: 10px; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--panel-2); }
 .runner-counts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; }
 .runner-steps { width: 100%; border-collapse: collapse; font-size: 12.5px; }
@@ -654,6 +662,11 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line); border-bottom-width
 .devtools-resize:hover, .devtools-resize.dragging { background: var(--line); }
 .devtools-tabs { flex: none; align-items: center; }
 .dt-actions { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+.dt-menu-backdrop { position: fixed; inset: 0; z-index: 59; }
+.menu.dt-copy-menu { max-height: calc(100vh - 16px); overflow-y: auto; }
+.menu.dt-copy-menu button { display: flex; align-items: center; gap: 6px; }
+.menu.dt-copy-menu .menu-check { font-size: 11px; }
+.menu.dt-copy-menu button:disabled { color: var(--mute); opacity: .55; cursor: default; background: none; }
 .dt-raw { font-size: var(--code-size, 12px); white-space: pre; overflow-x: auto; }
 .dt-raw-note { margin: 0 0 6px; }
 .dt-raw-actions { display: flex; gap: 8px; align-items: center; margin-top: 4px; }

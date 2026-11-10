@@ -5,7 +5,7 @@ const start = (runId: string): DevToolsEvent => ({ channel: 'devtools:run', payl
 const end = (runId: string): DevToolsEvent => ({ channel: 'devtools:run', payload: { type: 'end', runId, collectionId: 'c', result: null, error: 'failed' } });
 const step = (runId: string): DevToolsEvent => ({
   channel: 'runner:event',
-  payload: { runnerId: 'x', type: 'step-start', index: 0, collectionId: 'c', environment: '', url: '', step: { requestId: 'r', name: 'n', method: 'GET', folder: '', runId, status: 'running', tests: { passed: 0, failed: 0, errors: 0 }, testResults: [] } }
+  payload: { runnerId: 'x', type: 'step-start', index: 0, collectionId: 'c', environment: '', url: '', step: { requestId: 'r', name: 'n', method: 'GET', folder: '', iteration: 1, runId, status: 'running', tests: { passed: 0, failed: 0, errors: 0 }, testResults: [] } }
 });
 const ids = (log: DevToolsLog): string[] => log.all().map((e) => (e.channel === 'devtools:run' ? `${e.payload.type}:${e.payload.runId}` : `step:${e.payload.step.runId}`));
 

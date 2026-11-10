@@ -69,11 +69,13 @@ const CHANNELS: [string, string, number][] = [
   ['runs.cancel', 'runs:cancel', 1],
   ['runs.saveBody', 'runs:save-body', 2],
   ['runs.bodyBytes', 'runs:body-bytes', 1],
-  ['runs.curlWithSecrets', 'runs:curl-with-secrets', 1],
+  ['runs.curlWithSecrets', 'runs:curl-with-secrets', 2],
   ['runs.rawWithSecrets', 'runs:raw-with-secrets', 1],
   ['runs.cookieValue', 'runs:cookie-value', 2],
   ['runner.start', 'runner:start', 3],
   ['runner.cancel', 'runner:cancel', 1],
+  ['runner.pickDataFile', 'runner:pick-data-file', 0],
+  ['runner.exportReport', 'runner:export-report', 2],
   ['oauth2.token', 'oauth2:token', 3],
   ['cookies.list', 'cookies:list', 1],
   ['cookies.upsert', 'cookies:upsert', 3],
@@ -121,10 +123,12 @@ it('passes an omitted optional argument through as undefined, as the desktop pre
   void api.cookies.clear('c1');
   void api.git.commit('root', [], 'message');
   void api.cookies.upsert('c1', { name: 'a', value: 'b', domain: 'api.example.test', path: '/', secure: false, httpOnly: false, hostOnly: true } as never);
+  void api.runs.curlWithSecrets('run-1');
   expect(invoke.mock.calls).toEqual([
     ['cookies:clear', 'c1', undefined],
     ['git:commit', 'root', [], 'message', undefined],
-    ['cookies:upsert', 'c1', expect.objectContaining({ name: 'a' }), undefined]
+    ['cookies:upsert', 'c1', expect.objectContaining({ name: 'a' }), undefined],
+    ['runs:curl-with-secrets', 'run-1', undefined]
   ]);
 });
 
