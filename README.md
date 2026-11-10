@@ -14,7 +14,7 @@ The application is MIT licensed, needs no Yept account and has no telemetry. Col
 - Edit requests with headers, query parameters, JSON, text, XML, URL-encoded forms and multipart file uploads.
 - Use environments and encrypted local secrets, bearer/basic/API-key auth, and OAuth2 client credentials with token caching.
 - Run pre/post-request scripts, assertions and a sequential collection runner, with CSV or JSON data files, repeat counts, a delay between requests, and JUnit or HTML reports. Unresolved variables block sending.
-- Inspect redirect hops, sent headers, timings, TLS details, cookies, reconstructed raw HTTP and masked cURL exports in Dev tools.
+- Inspect redirect hops, sent headers, timings, TLS details, cookies, reconstructed raw HTTP in Dev tools. Copy a request as cURL, C# `HttpClient`, PowerShell `Invoke-RestMethod`, JavaScript `fetch` or axios, or Python `requests`, with secrets masked unless you ask for them.
 - Keep response history with redaction before storage, and follow requests across renames.
 - Review diffs, stage files, commit selected changes, push, fetch and pull with the desktop Git panel. A leak check flags common credential patterns.
 - Import Postman, Insomnia, OpenAPI and Bruno files; export a bundled OpenCollection file. Paste a curl command to create a request.
@@ -24,7 +24,7 @@ The application is MIT licensed, needs no Yept account and has no telemetry. Col
 
 ![A synthetic request and response with network diagnostics in Yept](docs/images/request-diagnostics.png)
 
-Screenshots use an isolated profile and synthetic fixtures. See the [user guide](docs/user-guide.md) for the interface and keyboard shortcuts.
+Screenshots use an isolated profile and synthetic fixtures. See the [user guide](docs/user-guide.md) for the interface and keyboard shortcuts. To run the same requests and tests in CI with Bruno's CLI, see [running collections in CI](docs/ci.md).
 
 ## Downloads and platform status
 

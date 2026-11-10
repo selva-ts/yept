@@ -151,8 +151,13 @@ export async function run(): Promise<void> {
     ['a request panel send reaches Dev Tools', async () => {
       const login = collection('Sample Travel').children!.find((c) => c.name === 'Auth')!.children![0];
       const doc = (await invoke('requests:get', login.id)).doc;
-      await invoke('runs:start', randomUUID(), login.id, doc);
+      const runId = randomUUID();
+      await invoke('runs:start', runId, login.id, doc);
       await until(() => shown()!.runs === networkBefore + 1, 'the send in Network');
+      // Copy as another language, with secrets: rebuilt from the unmasked request kept by the services.
+      const basic = Buffer.from(`sample-client:${CLIENT_SECRET}`).toString('base64');
+      const powershell = await invoke('runs:curl-with-secrets', runId, 'powershell') as string;
+      assert.ok(powershell.includes('Invoke-RestMethod @params') && powershell.includes(basic), powershell);
     }],
     ['runs only the requests under a folder', async () => {
       const bookings = collection('Sample Travel').children!.find((c) => c.name === 'Bookings')!;

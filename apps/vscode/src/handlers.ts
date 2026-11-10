@@ -239,9 +239,9 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
     if (!active.has(id)) throw new Error('Run not active');
     runs.cancel(id);
   });
-  handle('runs:curl-with-secrets', 1, (id) => {
+  handle('runs:curl-with-secrets', [1, 2], (id, language) => {
     text(id);
-    return runs.curlWithSecrets(id);
+    return runs.curlWithSecrets(id, language ?? 'curl');
   });
   handle('runs:raw-with-secrets', 1, (id) => {
     text(id);

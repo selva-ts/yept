@@ -110,6 +110,9 @@ For the installed build, run `dist\Yept-Setup-0.9.0.exe` instead of `npm run dev
 | F10 | Raw response with `Set-Cookie`; **Copy**, then *Show cookie values* and **Copy** | First copy has the values masked, the second has them; **…with secrets** on the request includes the token (last request of a redirect chain only) | |
 | F11 | Import a Postman collection whose pre-request script logs in with `pm.sendRequest`; send a request | The login runs; Network shows it as a **script** row; *Show the run that sent it* and **Scripts sent** move between them; the client secret and token are masked in Console and Network | |
 | F12 | A pre-request script calling `bru.sendRequest` on a slow endpoint; press **Cancel**, then send and wait | Cancel stops at once (Cancelled); otherwise the script stops after 5 s saying it was waiting for `bru.sendRequest`; the script row shows Cancelled | |
+| F13 | Network → a request with a bearer token → **Copy as ▾**, keyboard only (arrows, Enter, Esc) | Menu opens above the button when the drawer is low, focus starts on *Include secrets and cookies*; each language copies with `••••••`; ticked, the copy has the token and the tick is gone next time | |
+| F14 | Paste each **Copy as** language (with secrets) into its tool: Visual Studio or `dotnet run app.cs`, PowerShell 7, Node.js (`.mjs`, axios installed), Python with `requests`, against the fixture server | Each sends the same method, URL, headers and body as Yept; the response prints | |
+| F15 | Same in the VS Code extension's **Yept** Dev Tools view | Menu fits inside the panel; copies land on the clipboard; *with secrets* works for a request sent from a panel | |
 
 ## G. Source control (use a disposable collections repository)
 
@@ -150,6 +153,7 @@ For the installed build, run `dist\Yept-Setup-0.9.0.exe` instead of `npm run dev
 | Commit the request and open it on a second computer (or a second Windows user) | The outside file shows *No file chosen on this computer*; the collection file is found | |
 | Open the same collection in Bruno after saving | Bruno shows the multipart fields and the collection-relative file; the request sends there | |
 | Copy as cURL (with secrets), run it in Git Bash | curl sends the same fields and files | |
+| Copy as ▾ → PowerShell (with secrets), run it in PowerShell 7; then in Windows PowerShell 5.1 | 7 sends the fields and files; 5.1 stops at `-Form`, as the comment at the top says | |
 | Import a Postman collection with a file field | The import preview says the exporting computer's file path was left out; the field is a file field with no file | |
 
 ## J. HTML and XML responses

@@ -89,7 +89,7 @@ export function createApi(invoke: Invoke, subscribe: Subscribe): YeptApi {
       start: (runId, requestId, doc) => invoke('runs:start', runId, requestId, doc),
       cancel: (runId) => invoke('runs:cancel', runId),
       saveBody: (runId, name) => invoke('runs:save-body', runId, name),
-      curlWithSecrets: (runId) => invoke('runs:curl-with-secrets', runId),
+      curlWithSecrets: (runId, language) => invoke('runs:curl-with-secrets', runId, language),
       rawWithSecrets: (runId) => invoke('runs:raw-with-secrets', runId),
       cookieValue: (runId, index) => invoke('runs:cookie-value', runId, index)
     },
