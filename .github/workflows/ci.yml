@@ -39,14 +39,17 @@ jobs:
             runner: windows-2025
             platform: win
             arch: x64
+            package-script: package:win
           - name: macOS arm64
             runner: macos-15
             platform: mac
             arch: arm64
+            package-script: package:mac-arch
           - name: macOS x64
             runner: macos-15-intel
             platform: mac
             arch: x64
+            package-script: package:mac-arch
     defaults:
       run:
         shell: bash
@@ -106,7 +109,7 @@ jobs:
         run: npm run e2e 2>&1 | tee out/ci/e2e.log
 
       - name: Package desktop app
-        run: npm run package:${{ matrix.platform }} -- --${{ matrix.arch }} --publish never 2>&1 | tee out/ci/package.log
+        run: npm run ${{ matrix.package-script }} -- --${{ matrix.arch }} --publish never 2>&1 | tee out/ci/package.log
 
       - name: Check Windows package
         if: matrix.platform == 'win'
