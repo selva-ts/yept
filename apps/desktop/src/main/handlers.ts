@@ -144,7 +144,8 @@ export function createHandlers(host: AppHost): { handlers: HandlerRegistry; clos
   handle('import:pick', () => importer.pick());
   handle('import:from-bru', (collectionId: string) => importer.fromBru(collectionId));
   handle('import:check', (planId: string, name: string) => importer.check(planId, name));
-  handle('import:apply', (planId: string, name: string, fixIds: string[], policy: 'copy' | 'skip' | 'replace') => importer.apply(planId, name, fixIds, policy));
+  // Held like other workspace changes, so a watcher reload that started mid-write can't replace the snapshot after it.
+  handle('import:apply', (planId: string, name: string, fixIds: string[], policy: 'copy' | 'skip' | 'replace') => workspaces.exclusive(() => importer.apply(planId, name, fixIds, policy)));
   handle('import:export', (collectionId: string, includeEnvironments: boolean) => importer.export(collectionId, includeEnvironments));
 
   const settingsView = () => ({ settings: appSettings.get(), historyRuns: runs.history.stats().runs, historyBytes: runs.history.stats().bytes, proxyPasswordSet: appSettings.hasProxyPassword() });
