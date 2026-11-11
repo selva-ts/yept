@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, nativeTheme, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, nativeTheme, session, shell } from 'electron';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import sandboxWorkerPath from '@yept/core/engine/sandbox/worker.mjs?modulePath';
@@ -25,6 +25,8 @@ export function createDesktopHost(getWindow: () => BrowserWindow | null, appeara
     },
     trash: (path) => shell.trashItem(path),
     openExternal: (url) => { openExternalUrl(url, (safe) => shell.openExternal(safe)); },
+    // Chromium's answer: Windows proxy settings, including a PAC script.
+    resolveProxy: (url) => session.defaultSession.resolveProxy(url),
     openAuthorizationUrl: (url) => shell.openExternal(url),
     writeClipboard: (text) => clipboard.writeText(text),
     cipher: safeCipher,

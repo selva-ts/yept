@@ -204,7 +204,7 @@ const CORPUS: Case[] = [
     name: 'options with no per-request setting are reported',
     command: 'curl -k --cert client.pem -x http://proxy.example.test:8080 --digest -o out.json --frobnicate -c jar.txt https://api.example.test/',
     expected: { method: 'GET', url: 'https://api.example.test/', headers: [] },
-    notes: [/-k is not imported: TLS/, /--cert is not imported: client certificates/, /-x is not imported: proxies/, /--digest is not imported/, /-c is not imported: cookies/, /output.*-o/, /Not recognised.*--frobnicate/]
+    notes: [/-k is not imported: TLS/, /--cert is not imported: client certificates/, /-x is not imported: set a proxy in Settings/, /--digest is not imported/, /-c is not imported: cookies/, /output.*-o/, /Not recognised.*--frobnicate/]
   },
   {
     name: 'file-reading options are reported, never read',

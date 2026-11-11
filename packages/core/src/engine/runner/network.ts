@@ -8,6 +8,7 @@ import { isIP } from 'node:net';
 import type { TLSSocket, PeerCertificate } from 'node:tls';
 import followRedirects from 'follow-redirects';
 import type { CertificateInfo, ConnectionInfo, PhaseTimings } from '../../shared/model';
+import { viaProxy } from '../net/proxy';
 
 /** A hop with unmasked headers. The runner masks it before it leaves the engine. */
 export interface WireHop {
@@ -65,9 +66,17 @@ function certificate(s: TLSSocket): CertificateInfo | undefined {
   }
 }
 
-/** `dialled` is where the request connected (host or looked-up IP, and port): sockets don't always report their peer. */
-function connectionOf(socket: Socket | null | undefined, dialled: { address?: string; port?: number }, httpVersion?: string, proxy?: string): ConnectionInfo {
-  const info: ConnectionInfo = { httpVersion, proxy, remoteAddress: socket?.remoteAddress || dialled.address, remotePort: socket?.remotePort || dialled.port };
+/**
+ * `dialled` is where the request connected (host or looked-up IP, and port): sockets don't always report their peer.
+ * Through a proxy, the remote address is the proxy's.
+ */
+function connectionOf(socket: Socket | null | undefined, dialled: { address?: string; port?: number }, httpVersion?: string): ConnectionInfo {
+  const via = socket ? viaProxy.get(socket) : undefined;
+  const info: ConnectionInfo = { httpVersion, remoteAddress: socket?.remoteAddress || dialled.address, remotePort: socket?.remotePort || dialled.port };
+  if (via) {
+    info.proxy = via.proxy;
+    info.proxySource = via.source;
+  }
   if (!socket) return info;
   const t = socket as TLSSocket;
   if (t.encrypted) info.tls = { protocol: t.getProtocol() ?? '', cipher: t.getCipher()?.name ?? '', certificate: certificate(t) };
@@ -98,7 +107,6 @@ function headerList(h: Record<string, unknown> | undefined): [string, string][] 
 export class WireRecorder {
   readonly hops: WireHop[] = [];
   private current: { hop: WireHop; marks: Marks; socket: Socket | null; host: string; port: number } | null = null;
-  private proxy: string | undefined;
 
   /** Starts a hop. `options` are its request options (hostname, port, protocol). */
   private begin(method: string, url: string, options: { hostname?: string; port?: number | string; protocol?: string }): void {
@@ -118,6 +126,18 @@ export class WireRecorder {
     const m = cur.marks;
     cur.socket = socket;
     m.socket = performance.now();
+    // A proxy tunnel arrives already connected; the agent timed the connection to the proxy and the CONNECT.
+    // Only its first request gets those times: later ones reuse the connection.
+    const via = viaProxy.get(socket);
+    if (via?.marks) {
+      const t = via.marks;
+      via.marks = undefined;
+      m.socket = t.start;
+      m.lookup = t.lookup;
+      m.connect = t.tunnel ?? t.connect;
+      if ((socket as TLSSocket).encrypted) socket.once('secureConnect', () => (m.secure = performance.now()));
+      return;
+    }
     if (!socket.connecting) {
       m.reused = true;
       return;
@@ -153,7 +173,7 @@ export class WireRecorder {
     // Read the socket while it's live: once the body ends it may be pooled or closed and report nothing.
     if (!cur.hop.connection.httpVersion) {
       const dialled = { address: m.address ?? (isIP(cur.host) ? cur.host : undefined), port: cur.port };
-      cur.hop.connection = connectionOf(cur.socket, dialled, httpVersion, this.proxy);
+      cur.hop.connection = connectionOf(cur.socket, dialled, httpVersion);
     }
   }
 
@@ -169,9 +189,6 @@ export class WireRecorder {
     return {
       request: (options: any, cb: (res: http.IncomingMessage) => void): http.ClientRequest => {
         const isHttps = options.protocol === 'https:';
-        // axios rewrites the request for an HTTP proxy: host and port become the proxy's, the path the full URL.
-        const viaProxy = typeof options.path === 'string' && /^https?:\/\//i.test(options.path);
-        this.proxy = viaProxy ? `${options.hostname}:${options.port}` : undefined;
         this.begin(options.method, opts.url, options);
 
         const onResponse = (res: http.IncomingMessage): void => {

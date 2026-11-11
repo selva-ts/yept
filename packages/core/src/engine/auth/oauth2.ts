@@ -238,7 +238,9 @@ async function exchange(cfg: ResolvedOAuth2, endpoint: string, fields: Record<st
     signal: o.signal,
     maxRedirects: 0,
     httpAgent: o.httpAgent,
-    httpsAgent: o.httpsAgent
+    httpsAgent: o.httpsAgent,
+    // The agents handle proxies.
+    proxy: false
   });
   let body: Record<string, unknown> = {};
   try {

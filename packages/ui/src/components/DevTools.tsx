@@ -188,13 +188,15 @@ function TimingView({ t }: { t: PhaseTimings }): React.JSX.Element {
   );
 }
 
+const PROXY_SOURCES = { manual: 'manual proxy', system: 'system settings', environment: 'environment variable' } as const;
+
 function ConnectionView({ hop }: { hop: NetworkHop }): React.JSX.Element {
   const c = hop.connection;
   const cert = c.tls?.certificate;
   const rows: [string, string | undefined][] = [
     ['Remote address', c.remoteAddress ? `${c.remoteAddress}${c.remotePort ? `:${c.remotePort}` : ''}` : undefined],
     ['HTTP version', c.httpVersion],
-    ['Proxy', c.proxy ?? 'None'],
+    ['Proxy', c.proxy ? `${c.proxy}${c.proxySource ? ` (${PROXY_SOURCES[c.proxySource]})` : ''}` : 'None'],
     ['TLS', c.tls ? `${c.tls.protocol} · ${c.tls.cipher}` : 'Not encrypted (http)'],
     ...(cert
       ? ([

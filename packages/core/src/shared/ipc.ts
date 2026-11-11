@@ -11,6 +11,15 @@ export interface SelfTestResult {
 }
 
 /** Result of any tree mutation: the new tree plus the id of the item created or changed. */
+/** App settings as the Settings dialog sees them. */
+export interface AppSettingsView {
+  settings: AppSettings;
+  historyRuns: number;
+  historyBytes: number;
+  /** Whether a proxy password is stored. The password itself never reaches the page. */
+  proxyPasswordSet?: boolean;
+}
+
 export interface MutationResult {
   snapshot: WorkspaceSnapshot;
   id?: string;
@@ -246,10 +255,12 @@ export interface YeptApi {
   };
 
   appSettings: {
-    get: () => Promise<{ settings: AppSettings; historyRuns: number; historyBytes: number }>;
-    set: (settings: AppSettings) => Promise<{ settings: AppSettings; historyRuns: number; historyBytes: number }>;
+    get: () => Promise<AppSettingsView>;
+    set: (settings: AppSettings) => Promise<AppSettingsView>;
     /** Saves and applies appearance settings (light/dark, theme, fonts) immediately. */
-    setAppearance: (change: Partial<Appearance>) => Promise<{ settings: AppSettings; historyRuns: number; historyBytes: number }>;
+    setAppearance: (change: Partial<Appearance>) => Promise<AppSettingsView>;
+    /** Stores the proxy password encrypted on this machine, or removes it (null). It is never read back. */
+    setProxyPassword: (password: string | null) => Promise<AppSettingsView>;
   };
 
   runs: {

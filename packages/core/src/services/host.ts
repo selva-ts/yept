@@ -27,6 +27,11 @@ export interface AppHost {
   saveDialog(options: SaveDialogOptions): Promise<{ canceled: boolean; filePath?: string }>;
   trash(path: string): Promise<void>;
   openExternal(url: string): void;
+  /**
+   * The operating system's proxy for a URL in PAC result format ("PROXY host:port; DIRECT"), following its settings
+   * and any PAC script. Absent where the platform applies its own proxy settings to requests (VS Code).
+   */
+  resolveProxy?(url: string): Promise<string>;
   /** Opens a validated OAuth2 authorization URL and reports whether the browser opened. */
   openAuthorizationUrl?(url: string): Promise<void>;
   writeClipboard(text: string): void;

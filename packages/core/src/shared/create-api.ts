@@ -84,7 +84,8 @@ export function createApi(invoke: Invoke, subscribe: Subscribe): YeptApi {
     appSettings: {
       get: () => invoke('app-settings:get'),
       set: (s) => invoke('app-settings:set', s),
-      setAppearance: (change) => invoke('app-settings:set-appearance', change)
+      setAppearance: (change) => invoke('app-settings:set-appearance', change),
+      setProxyPassword: (password) => invoke('app-settings:set-proxy-password', password)
     },
     runs: {
       start: (runId, requestId, doc) => invoke('runs:start', runId, requestId, doc),

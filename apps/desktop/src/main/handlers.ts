@@ -138,12 +138,17 @@ export function createHandlers(host: AppHost): { handlers: HandlerRegistry; clos
   handle('import:apply', (planId: string, name: string, fixIds: string[], policy: 'copy' | 'skip' | 'replace') => importer.apply(planId, name, fixIds, policy));
   handle('import:export', (collectionId: string, includeEnvironments: boolean) => importer.export(collectionId, includeEnvironments));
 
-  const settingsView = () => ({ settings: appSettings.get(), historyRuns: runs.history.stats().runs, historyBytes: runs.history.stats().bytes });
+  const settingsView = () => ({ settings: appSettings.get(), historyRuns: runs.history.stats().runs, historyBytes: runs.history.stats().bytes, proxyPasswordSet: appSettings.hasProxyPassword() });
   handle('app-settings:get', () => settingsView());
   const applyAppearance = (s: AppSettings): void => host.applyAppearance(s);
   handle('app-settings:set', (s: AppSettings) => {
     applyAppearance(appSettings.set(s));
     runs.history.prune();
+    return settingsView();
+  });
+  // Stored encrypted; the page only learns whether one is set.
+  handle('app-settings:set-proxy-password', (password: string | null) => {
+    appSettings.setProxyPassword(typeof password === 'string' ? password : null);
     return settingsView();
   });
   // Applies at once, without Save. Only appearance keys are taken from the change.
