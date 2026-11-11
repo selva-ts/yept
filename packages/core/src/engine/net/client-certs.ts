@@ -39,17 +39,17 @@ export function certificateFor<T extends { host: string }>(list: T[] | undefined
   return list?.find((c) => hostMatches(c.host, host, port));
 }
 
-/** Plain words for what OpenSSL says about a certificate or key it can't use. */
+/** Plain words for what OpenSSL (Node) or BoringSSL (Electron) says about a certificate or key it can't use. */
 function explain(e: Error, c: ClientCertificate, passphrase: string | undefined): string {
   const m = e.message;
-  if (/mac verify failure|bad decrypt|bad password|BAD_DECRYPT|interrupted or cancelled|PKCS12_parse/i.test(m)) {
+  if (/mac verify failure|bad decrypt|bad password|BAD_DECRYPT|INCORRECT_PASSWORD|interrupted or cancelled|PKCS12_parse/i.test(m)) {
     return passphrase ? 'the passphrase is wrong' : 'it needs a passphrase';
   }
   if (/key values mismatch|KEY_VALUES_MISMATCH/i.test(m)) return "the key doesn't belong to the certificate";
   if (/no start line|NO_START_LINE|bad base64|unsupported/i.test(m)) {
     return c.pfxFile ? "it isn't a PFX (PKCS#12) file" : "the certificate or key isn't in PEM format";
   }
-  if (/not enough data|wrong tag|header too long|nested asn1/i.test(m)) return c.pfxFile ? "it isn't a PFX (PKCS#12) file" : 'the file is damaged';
+  if (/not enough data|wrong tag|header too long|nested asn1|BAD_PKCS12_DATA|DECODE_ERROR|BAD_ENCODING/i.test(m)) return c.pfxFile ? "it isn't a PFX (PKCS#12) file" : 'the file is damaged';
   return m;
 }
 

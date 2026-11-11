@@ -21,6 +21,10 @@ To start from a curl command (from API docs, or **Copy as cURL** in a browser's 
 
 Use the environment switcher beside **Send** to create or select an environment. In **Environments**, set shared values such as `baseUrl` in the file. Mark a credential variable **Secret**, save, then enter its value under **This machine only**. Refer to it as `{{variableName}}` in a URL, header, body or auth field. Switching environments keeps each environment's secrets and runtime tokens separate. The URL preview masks secrets and marks missing variables before you send. If you paste a credential into a shared field, use **Store as local secret** when prompted.
 
+### Client certificates (mutual TLS)
+
+Some APIs only accept callers that present a client certificate. In **Environments**, under **TLS on this machine**, choose **+ Add client certificate**. Enter the host it is for (`api.example.test`, or `*.example.test` for its subdomains; add `:8443` to limit it to one port), choose the certificate file and, if it has one, type its passphrase. A PFX (`.pfx`, `.p12`) holds the certificate and its key. A PEM certificate (`.pem`, `.crt`) also needs its key file. The files stay where they are: Yept keeps their paths for this environment on this computer, never in the collection, and the passphrase is stored encrypted. The certificate is offered whenever a server asks for one, including through a proxy. Dev tools shows its subject under **Network → Connection**. A wrong passphrase, a key that doesn't match or a missing file stops the request with an explanation. If the server turns the certificate down, the message says so.
+
 ## 3. Log in and use a token
 
 Create a login request using the API's documented method, URL and body. In its post-response variables, set a name such as `accessToken` from the documented response path (for example `res.body.access_token`). Mark `accessToken` secret in the active environment. For a protected request, choose **Bearer** auth and use `{{accessToken}}`, or set bearer auth on the collection and inherit it in requests. Send the login request first, then the protected request. A failed login clears the previous extracted token.

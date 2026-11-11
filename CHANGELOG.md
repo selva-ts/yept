@@ -5,6 +5,7 @@
 ### Added
 
 - Proxy settings: the system proxy (Windows settings, setup scripts and the usual environment variables), a manual HTTP proxy with a bypass list, or none, with optional Basic sign-in stored encrypted. HTTPS goes through CONNECT tunnels, and Network shows the proxy each request used.
+- Client certificates for mutual TLS: a PFX, or a PEM certificate and key, per environment and host pattern, kept on this computer with the passphrase encrypted. Network shows the certificate's subject.
 
 ## 0.9.0
 

@@ -19,6 +19,7 @@ The application is MIT licensed, needs no Yept account and has no telemetry. Col
 - Filter JSON responses with JSONPath, set a value as a variable or local secret, save bodies to a file as received, and preview HTML, images and PDFs in a sandboxed frame.
 - Review diffs, stage files, commit selected changes, push, fetch and pull with the desktop Git panel. A leak check flags common credential patterns.
 - Import Postman, Insomnia, OpenAPI and Bruno files; export a bundled OpenCollection file. Paste a curl command to create a request.
+- Present client certificates (PFX, or a PEM certificate and key) to APIs that require mutual TLS, chosen per environment and host, with passphrases encrypted on this computer.
 - Send through the system proxy (Windows settings, a setup script, or `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`) or a manual HTTP proxy with a bypass list and Basic sign-in. Network shows which proxy each request used.
 - Choose light/dark mode, themes and installed fonts.
 
