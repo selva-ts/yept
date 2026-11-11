@@ -21,6 +21,7 @@ import { isSnippetLanguage, toSnippet } from '@yept/core/shared/snippets';
 import { rawRequestHead } from '@yept/core/shared/raw-http';
 import type { AppHost } from './host';
 import { RecentCookies } from './recent-cookies';
+import { ProxyRouter } from '@yept/core/engine/net/proxy';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_BODY_BYTES = 50 * 1024 * 1024; // processing limit
@@ -72,6 +73,8 @@ export function withoutData(runtime: Record<string, string>, data: Record<string
 export interface RunServiceOptions {
   /** Checked at each run: why scripts may not run now (the extension's untrusted folders), or undefined. */
   scriptsBlocked?: () => string | undefined;
+  /** The platform applies its own proxy settings to every request (VS Code), so Yept's stay unused. */
+  proxyByPlatform?: boolean;
 }
 
 export class RunService {
@@ -83,11 +86,12 @@ export class RunService {
   private tokens = new TokenCache();
   private manualTokenFetches = new Map<string, () => void>();
   private sandbox: SandboxHost | null = null;
+  private proxyRouter: ProxyRouter | undefined;
   private historyStore: HistoryStore | null = null;
   private readonly ownsHistory: boolean;
 
   /** A history store passed in is shared with other services and stays open when this one closes. */
-  constructor(private env: EnvService, private settings: SettingsService, private cookies: CookieService, private platform: Pick<AppHost, 'userDataPath' | 'appVersion' | 'sandboxWorkerPath' | 'openAuthorizationUrl'>, history?: HistoryStore, private options: RunServiceOptions = {}) {
+  constructor(private env: EnvService, private settings: SettingsService, private cookies: CookieService, private platform: Pick<AppHost, 'userDataPath' | 'appVersion' | 'sandboxWorkerPath' | 'openAuthorizationUrl' | 'resolveProxy'>, history?: HistoryStore, private options: RunServiceOptions = {}) {
     setUserAgent(`Yept/${this.platform.appVersion()}`);
     this.historyStore = history ?? null;
     this.ownsHistory = !history;
@@ -96,6 +100,16 @@ export class RunService {
   private host(): SandboxHost {
     this.sandbox ??= new SandboxHost(this.platform.sandboxWorkerPath, { timeoutMs: SCRIPT_TIMEOUT_MS, poolSize: 2 });
     return this.sandbox;
+  }
+
+  /** The proxy router for the current settings: the same one while they don't change, so its answers stay cached. */
+  private proxy(): ProxyRouter | undefined {
+    if (this.options.proxyByPlatform) return undefined;
+    const p = this.settings.get().proxy;
+    const resolveProxy = this.platform.resolveProxy?.bind(this.platform);
+    const next = new ProxyRouter({ ...p, password: this.settings.proxyPassword() }, { env: process.env, system: resolveProxy });
+    if (this.proxyRouter?.key !== next.key) this.proxyRouter = next;
+    return this.proxyRouter;
   }
 
   get history(): HistoryStore {
@@ -126,6 +140,7 @@ export class RunService {
         layers: e.layers,
         secretNames: e.secretNames,
         tls: e.tls,
+        proxy: this.proxy(),
         inherited: { collection: ctx.collection, folders: ctx.folders },
         sandbox: this.host(),
         scriptsBlocked: this.options.scriptsBlocked?.(),
@@ -232,7 +247,7 @@ export class RunService {
     const scope = tokenScope(ctx.collectionDir, e.environment);
     if (action === 'forget') this.tokens.forget(scope, cfg);
     if (action === 'fetch') {
-      const agents = getAgents(e.tls);
+      const agents = getAgents(e.tls, this.proxy());
       const open = this.platform.openAuthorizationUrl;
       const cancel = () => this.tokens.cancel(scope, cfg);
       this.manualTokenFetches.set(requestId, cancel);

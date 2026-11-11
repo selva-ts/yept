@@ -424,6 +424,8 @@ export interface ConnectionInfo {
   httpVersion?: string;
   /** Proxy host:port when the request went through one. */
   proxy?: string;
+  /** Where that proxy came from. */
+  proxySource?: ProxySource;
   tls?: { protocol: string; cipher: string; certificate?: CertificateInfo };
 }
 
@@ -540,13 +542,32 @@ export interface AppSettings {
   historyBodyLimitMb: number;
   /** Store Set-Cookie responses and send matching cookies automatically. */
   cookies: boolean;
+  /** How requests reach the network. The proxy password is kept apart, encrypted. */
+  proxy: ProxySettings;
 }
+
+/** 'system': environment variables, then the operating system's settings. 'manual': the proxy below. 'off': direct. */
+export type ProxyMode = 'system' | 'manual' | 'off';
+/** Where the proxy a request used came from. */
+export type ProxySource = 'environment' | 'system' | 'manual';
+
+export interface ProxySettings {
+  mode: ProxyMode;
+  /** Manual proxy address, e.g. http://proxy.example.test:8080. */
+  url: string;
+  /** Hosts that skip the manual proxy: commas or new lines, `*.example.test`, `10.0.0.0/8`, `<local>`. */
+  bypass: string;
+  /** Proxy sign-in (Basic) for any proxy whose address doesn't carry its own. */
+  username: string;
+}
+
+export const DEFAULT_PROXY: ProxySettings = { mode: 'system', url: '', bypass: '', username: '' };
 
 /** The settings that apply at once, without Save: light/dark, theme and fonts. */
 export type Appearance = Pick<AppSettings, 'theme' | 'palette' | 'uiFont' | 'codeFont' | 'codeFontSize'>;
 export const APPEARANCE_KEYS = ['theme', 'palette', 'uiFont', 'codeFont', 'codeFontSize'] as const satisfies readonly (keyof Appearance)[];
 
-export const DEFAULT_APP_SETTINGS: AppSettings = { theme: 'system', palette: 'blue', uiFont: '', codeFont: '', codeFontSize: CODE_SIZE.default, historyRunsPerRequest: 20, historyCapMb: 500, historyBodyLimitMb: 2, cookies: true };
+export const DEFAULT_APP_SETTINGS: AppSettings = { theme: 'system', palette: 'blue', uiFont: '', codeFont: '', codeFontSize: CODE_SIZE.default, historyRunsPerRequest: 20, historyCapMb: 500, historyBodyLimitMb: 2, cookies: true, proxy: DEFAULT_PROXY };
 
 export interface ExtractionResult {
   variable: string;

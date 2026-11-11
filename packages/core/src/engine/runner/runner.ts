@@ -13,6 +13,7 @@ import type { Readable } from 'node:stream';
 import axios, { type AxiosError, type AxiosResponse } from 'axios';
 import { interpolate, utils as brunoUtils } from '@usebruno/common';
 import { caOptions } from '../net/ca';
+import { ProxyError, proxyAgents, proxyName, type ProxyRouter } from '../net/proxy';
 import { AUTH_MODES, OAUTH2_AUTHORIZATION_CODE, isOAuth2Grant, type AuthConfig, type CookieUse, type ExtractionResult, type HttpMethod, type KeyValue, type NetworkHop, type OAuth2Use, type RequestDoc, type RunResult, type ScriptRequest, type ScriptStage, type SettingsDoc, type TestResult, type TimelineEntry } from '../../shared/model';
 import { findUnresolved } from '../../shared/vars';
 import { emptyEnvLayer, envVariables, resolveLayers, type VarLayers } from '../env/variables';
@@ -51,6 +52,8 @@ export interface RunOptions {
   collectionName?: string;
   processEnv?: Record<string, string>;
   tls?: { skipVerify: boolean; ca?: string[] };
+  /** Picks the proxy for each connection. Absent: connect directly (or as the host platform does). */
+  proxy?: ProxyRouter;
   /** Used when the request's own timeout is 0. */
   defaultTimeoutMs: number;
   /** Bytes buffered before reading stops and the result is marked truncated. */
@@ -99,19 +102,20 @@ const TEXT_TYPES = /^(text\/|application\/(json|xml|javascript|x-www-form-urlenc
 
 type Agents = { http: http.Agent; https: https.Agent };
 
-/** OS certificate store + Node roots, so the trusted ASP.NET dev cert works; plus any extra CA. */
-const newAgents = (tls?: RunOptions['tls'], extra: http.AgentOptions = {}): Agents => ({
-  http: new http.Agent({ keepAlive: true, ...extra }),
-  https: new https.Agent({ keepAlive: true, ...extra, ...caOptions(tls?.ca), rejectUnauthorized: !tls?.skipVerify })
-});
+/** OS certificate store + Node roots, so the trusted ASP.NET dev cert works; plus any extra CA. Through the proxy, if any. */
+const newAgents = (tls?: RunOptions['tls'], extra: http.AgentOptions = {}, proxy?: ProxyRouter): Agents => {
+  const httpOptions: http.AgentOptions = { keepAlive: true, ...extra };
+  const httpsOptions: https.AgentOptions = { keepAlive: true, ...extra, ...caOptions(tls?.ca), rejectUnauthorized: !tls?.skipVerify };
+  return proxy ? proxyAgents(proxy, httpOptions, httpsOptions) : { http: new http.Agent(httpOptions), https: new https.Agent(httpsOptions) };
+};
 
 const agentCache = new Map<string, Agents>();
-export function getAgents(tls?: RunOptions['tls']): Agents {
+export function getAgents(tls?: RunOptions['tls'], proxy?: ProxyRouter): Agents {
   // Keyed by the full CA content: certificates of the same length often share their opening characters.
-  const key = createHash('sha256').update(JSON.stringify([!!tls?.skipVerify, tls?.ca ?? []])).digest('hex');
+  const key = createHash('sha256').update(JSON.stringify([!!tls?.skipVerify, tls?.ca ?? [], proxy?.key ?? ''])).digest('hex');
   let a = agentCache.get(key);
   if (!a) {
-    a = newAgents(tls);
+    a = newAgents(tls, {}, proxy);
     agentCache.set(key, a);
   }
   return a;
@@ -469,6 +473,7 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
           environment,
           layers,
           tls: opts.tls,
+          proxy: opts.proxy,
           collectionPath,
           defaultTimeoutMs: opts.defaultTimeoutMs,
           maxBodyBytes: opts.maxBodyBytes,
@@ -643,8 +648,8 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
   const ownAuthorization = Object.keys(prepared.headers).some((k) => k.toLowerCase() === 'authorization');
   const challenge = opts.prepared || ownAuthorization ? null : challengeAuth(auth, I);
   // NTLM authenticates the connection, so its handshake gets one of its own, closed after the run.
-  const ownAgents = challenge?.sameConnection ? newAgents(opts.tls, { maxSockets: 1 }) : undefined;
-  const { http: httpAgent, https: httpsAgent } = ownAgents ?? getAgents(opts.tls);
+  const ownAgents = challenge?.sameConnection ? newAgents(opts.tls, { maxSockets: 1 }, opts.proxy) : undefined;
+  const { http: httpAgent, https: httpsAgent } = ownAgents ?? getAgents(opts.tls, opts.proxy);
 
   // ---------- OAuth2: a cached token, or a new one (shared with sends running at the same time) ----------
   const tokenCache = opts.oauth2?.cache ?? new TokenCache();
@@ -728,8 +733,19 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
   }
   if (challenge?.initial) prepared.headers.Authorization = challenge.initial;
 
+  // The proxy decision up front: a bad proxy setting stops the send here, and plain HTTP knows where to go.
+  let via = '';
+  if (opts.proxy) {
+    try {
+      const p = await opts.proxy.resolve(new URL(prepared.url));
+      if (p) via = ` via proxy ${proxyName(p)}`;
+    } catch (e) {
+      if (!(e instanceof ProxyError)) throw e;
+      return notSent({ outcome: 'prepare_error', message: e.message });
+    }
+  }
   let requestInfo: RunResult['request'] = { method: prepared.method, url: prepared.url, headers: Object.entries(prepared.headers) };
-  timeline.push({ atMs: at(), label: 'Request sent', detail: `${prepared.method} ${prepared.url}${opts.tls?.skipVerify ? ' (TLS verification off)' : ''}` });
+  timeline.push({ atMs: at(), label: 'Request sent', detail: `${prepared.method} ${prepared.url}${via}${opts.tls?.skipVerify ? ' (TLS verification off)' : ''}` });
 
   // ---------- send: one deadline for the whole exchange, one abort path for cancel and timeout ----------
   const ac = new AbortController();
@@ -776,6 +792,8 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
       validateStatus: () => true,
       httpAgent,
       httpsAgent,
+      // The agents handle proxies; axios's own (from environment variables) would bypass them.
+      proxy: false,
       // Bodies are bounded by maxBodyBytes below, not by axios.
       maxContentLength: Infinity,
       maxBodyLength: Infinity
@@ -995,13 +1013,18 @@ export async function run(doc: RequestDoc, opts: RunOptions): Promise<RunOutput>
     sent: sentRequest(), cookieValues, scriptRequests: scriptOutputs
   };
 
-  /** The last request on the wire as sent: the recorded headers when there are some, else the prepared ones. */
+  /**
+   * The last request on the wire as sent: the recorded headers when there are some, else the prepared ones. The
+   * proxy's own sign-in stays out (it is for the proxy, and copied elsewhere it would go to the API).
+   */
   function sentRequest(): RunOutput['sent'] {
     const last = recorder.hops.at(-1);
+    const ownProxyAuth = Object.keys(prepared.headers).some((k) => k.toLowerCase() === 'proxy-authorization');
+    const wire = last?.requestHeaders.filter(([k]) => ownProxyAuth || k.toLowerCase() !== 'proxy-authorization');
     return {
       method: last?.method ?? prepared.method,
       url: last?.url ?? prepared.url,
-      headers: last?.requestHeaders.length ? last.requestHeaders : Object.entries(prepared.headers),
+      headers: wire?.length ? wire : Object.entries(prepared.headers),
       body: prepared.data,
       form: parts
     };

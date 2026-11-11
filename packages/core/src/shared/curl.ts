@@ -442,7 +442,7 @@ export function parseCurl(command: string): ParsedCurl {
         if (name === 'upload-file') st.upload = true;
         if (CURL_ONLY.has(name)) curlOnly.push(flag);
         else if (NOT_IMPORTED[name]) notes.push(`${flag} is not imported: ${NOT_IMPORTED[name]}.`);
-        else if (name.startsWith('proxy') || name.startsWith('socks') || name === 'noproxy' || name === 'preproxy') notes.push(`${flag} is not imported: proxies are not supported.`);
+        else if (name.startsWith('proxy') || name.startsWith('socks') || name === 'noproxy' || name === 'preproxy') notes.push(`${flag} is not imported: set a proxy in Settings instead.`);
         else if (/^(tls|ssl)/.test(name) || name === 'ciphers' || name === 'pinnedpubkey') notes.push(`${flag} is not imported: TLS options other than the environment's TLS settings are not supported.`);
         else if (TAKES_VALUE.has(name) || SHORT[flag.slice(1)] === name) notes.push(`${flag} is not supported: ignored.`);
         else unknown.push(flag);

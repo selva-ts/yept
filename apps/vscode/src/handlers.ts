@@ -87,7 +87,7 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
   const env = new EnvService(ws, host, stores.local);
   const settings = stores.settings;
   const cookies = new CookieService(ws, env, settings, host, stores.cookies);
-  const runs = new RunService(env, settings, cookies, host, stores.history, { scriptsBlocked: hooks.scriptsBlocked });
+  const runs = new RunService(env, settings, cookies, host, stores.history, { scriptsBlocked: hooks.scriptsBlocked, proxyByPlatform: true });
   // Runner progress goes to every page; results are cut to what Dev Tools shows.
   const runner = new CollectionRunService(ws, runs, (e) => host.emit('runner:event', e.type === 'step-end' && e.result ? { ...e, result: devToolsResult(e.result) } : e), host);
   // Import and export run from the extension's commands, not from a page.

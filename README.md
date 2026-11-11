@@ -19,6 +19,7 @@ The application is MIT licensed, needs no Yept account and has no telemetry. Col
 - Filter JSON responses with JSONPath, set a value as a variable or local secret, save bodies to a file as received, and preview HTML, images and PDFs in a sandboxed frame.
 - Review diffs, stage files, commit selected changes, push, fetch and pull with the desktop Git panel. A leak check flags common credential patterns.
 - Import Postman, Insomnia, OpenAPI and Bruno files; export a bundled OpenCollection file. Paste a curl command to create a request.
+- Send through the system proxy (Windows settings, a setup script, or `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`) or a manual HTTP proxy with a bypass list and Basic sign-in. Network shows which proxy each request used.
 - Choose light/dark mode, themes and installed fonts.
 
 ![Yept collections home with synthetic sample collections](docs/images/collections.png)
@@ -122,7 +123,7 @@ The [desktop validation workflow](.github/workflows/ci.yml) checks pull requests
 - HTTP request workflows only: no dedicated WebSocket, gRPC or MQTT client, CLI runner or cloud collaboration service.
 - OAuth2 browser sign-in requires an HTTP loopback callback. Implicit and device-code grants and persistent token storage are unavailable.
 - Collection runs are sequential, at most 1,000 iterations, with no schedules or parallel runs. Data files are CSV or JSON up to 5 MB.
-- No Kerberos/Negotiate or proxy auth. AWS Signature v4 needs the access keys in the request: AWS profiles are not read.
+- No Kerberos/Negotiate. Proxies: HTTP proxies with Basic sign-in only (no SOCKS, no NTLM or Kerberos proxy sign-in); in VS Code, requests follow VS Code's own proxy settings. AWS Signature v4 needs the access keys in the request: AWS profiles are not read.
 - Bruno compatibility is limited to the supported file fields and script APIs. `.bru` collections open read-only and can be converted to YAML. Unsupported body types are retained when editing other fields but cannot be sent until changed to a supported type. `bru.runRequest` and multipart file sends through `bru.sendRequest` are unavailable.
 - Scripts have a five-second execution limit. `bru.sendRequest` shares that limit and permits at most ten requests per script.
 - The Git panel does not resolve merges, rebase, stash or force-push. Use your normal Git tool for those operations.

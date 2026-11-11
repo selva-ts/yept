@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CODE_FONTS, CODE_SIZE, PALETTES, UI_FONTS } from '@shared/appearance';
-import { DEFAULT_APP_SETTINGS, type AppSettings, type HistoryEntry, type OrphanedHistory } from '@shared/model';
+import { DEFAULT_APP_SETTINGS, type AppSettings, type HistoryEntry, type OrphanedHistory, type ProxySettings } from '@shared/model';
+import type { AppSettingsView } from '@shared/ipc';
 import { errorMessage, formatBytes, yept } from '@yept/ui/api';
 import { useStore } from '@yept/ui/store';
 import { useDevTools } from '@yept/ui/devtools';
@@ -46,13 +47,78 @@ function FontPicker({ label, value, choices, defaultLabel, onChange }: { label: 
   );
 }
 
+/** How requests reach the network: system settings, a manual proxy, or direct; and the proxy's sign-in. */
+function ProxySection({ value, onChange, passwordSet, password, onPassword, onClearPassword }: {
+  value: ProxySettings;
+  onChange: (p: ProxySettings) => void;
+  passwordSet: boolean;
+  /** A new password typed here, saved with Save; null when unchanged. */
+  password: string | null;
+  onPassword: (p: string | null) => void;
+  onClearPassword: () => void;
+}): React.JSX.Element {
+  const set = (change: Partial<ProxySettings>): void => onChange({ ...value, ...change });
+  const row = (label: string, control: React.JSX.Element, help?: string): React.JSX.Element => (
+    <label className="field-row" style={{ alignItems: 'flex-start' }}>
+      <span className="field-label" style={{ width: 200 }}>{label}</span>
+      <span style={{ display: 'grid', gap: 2, flex: 1 }}>
+        {control}
+        {help && <span className="mute small">{help}</span>}
+      </span>
+    </label>
+  );
+  return (
+    <>
+      <h4 className="section-title">Proxy</h4>
+      <p className="mute small" style={{ margin: 0 }}>
+        For requests, redirects, OAuth2 tokens and script requests. Localhost always connects directly. Kept on this computer only.
+      </p>
+      {row('Connect', (
+        <select className="input" style={{ width: 240 }} aria-label="Proxy" value={value.mode} onChange={(e) => set({ mode: e.target.value as ProxySettings['mode'] })}>
+          <option value="system">System proxy settings</option>
+          <option value="manual">Manual proxy</option>
+          <option value="off">Directly (no proxy)</option>
+        </select>
+      ), value.mode === 'system'
+        ? 'Uses HTTPS_PROXY, HTTP_PROXY and NO_PROXY when they are set, otherwise the Windows proxy settings (including a setup script).'
+        : value.mode === 'off' ? 'Ignores proxy settings and environment variables.' : undefined)}
+      {value.mode === 'manual' && (
+        <>
+          {row('Proxy address', (
+            <input className="input mono" aria-label="Proxy address" placeholder="http://proxy.example.test:8080" value={value.url} maxLength={2000} onChange={(e) => set({ url: e.target.value })} />
+          ), 'An HTTP proxy, http:// or https://. HTTPS requests go through it with CONNECT.')}
+          {row('Bypass for', (
+            <textarea className="input mono" rows={2} aria-label="Bypass proxy for" placeholder="*.internal.example.test, 10.0.0.0/8, <local>" value={value.bypass} maxLength={4000} onChange={(e) => set({ bypass: e.target.value })} />
+          ), 'Hosts that connect directly: separate with commas or new lines. example.test covers its subdomains; <local> means names without a dot.')}
+        </>
+      )}
+      {value.mode !== 'off' && (
+        <>
+          {row('Proxy username', (
+            <input className="input" style={{ width: 240 }} aria-label="Proxy username" autoComplete="off" value={value.username} maxLength={500} onChange={(e) => set({ username: e.target.value })} />
+          ), 'Basic sign-in, sent to the proxy only. Leave empty if the proxy needs none.')}
+          {row('Proxy password', (
+            <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input className="input" type="password" style={{ flex: 'none', width: 240 }} aria-label="Proxy password" autoComplete="new-password"
+                placeholder={passwordSet ? 'Saved (type to replace)' : 'Not set'} value={password ?? ''} onChange={(e) => onPassword(e.target.value === '' ? null : e.target.value)} />
+              {passwordSet && password === null && <button className="btn small" onClick={(e) => { e.preventDefault(); onClearPassword(); }}>Remove</button>}
+            </span>
+          ), 'Stored encrypted on this computer.')}
+        </>
+      )}
+    </>
+  );
+}
+
 export function AppSettingsDialog(): React.JSX.Element | null {
   const { appSettingsOpen, setAppSettingsOpen, setOrphansOpen, setAboutOpen, appearance, setAppearance, toast } = useStore();
-  const [data, setData] = useState<{ settings: AppSettings; historyRuns: number; historyBytes: number } | null>(null);
+  const [data, setData] = useState<AppSettingsView | null>(null);
   const [draft, setDraft] = useState<AppSettings | null>(null);
+  const [proxyPassword, setProxyPassword] = useState<string | null>(null);
 
   useEffect(() => {
     if (!appSettingsOpen) return;
+    setProxyPassword(null);
     yept.appSettings
       .get()
       .then((d) => {
@@ -66,7 +132,9 @@ export function AppSettingsDialog(): React.JSX.Element | null {
   const save = async (): Promise<void> => {
     try {
       // Appearance is applied on its own (below); keep whatever is current.
-      const d = await yept.appSettings.set({ ...draft, ...appearance });
+      let d = await yept.appSettings.set({ ...draft, ...appearance });
+      if (proxyPassword !== null) d = await yept.appSettings.setProxyPassword(proxyPassword);
+      setProxyPassword(null);
       setData(d);
       setDraft(d.settings);
       // The Cookies tab shows whether automatic cookies are on.
@@ -88,7 +156,15 @@ export function AppSettingsDialog(): React.JSX.Element | null {
     </label>
   );
   // Appearance is applied immediately, so only the other settings count as unsaved.
-  const dirty = JSON.stringify({ ...draft, ...appearance }) !== JSON.stringify({ ...data.settings, ...appearance });
+  const dirty = proxyPassword !== null || JSON.stringify({ ...draft, ...appearance }) !== JSON.stringify({ ...data.settings, ...appearance });
+  const clearProxyPassword = async (): Promise<void> => {
+    try {
+      setData(await yept.appSettings.setProxyPassword(null));
+      toast('Proxy password removed');
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    }
+  };
   const { theme, palette, uiFont, codeFont, codeFontSize } = DEFAULT_APP_SETTINGS;
   const isDefault = JSON.stringify(appearance) === JSON.stringify({ theme, palette, uiFont, codeFont, codeFontSize });
   return (
@@ -148,6 +224,8 @@ export function AppSettingsDialog(): React.JSX.Element | null {
               </span>
             </span>
           </label>
+          <ProxySection value={draft.proxy} onChange={(proxy) => setDraft({ ...draft, proxy })} passwordSet={!!data.proxyPasswordSet}
+            password={proxyPassword} onPassword={setProxyPassword} onClearPassword={() => void clearProxyPassword()} />
           <div><button className="btn small" onClick={() => { setAppSettingsOpen(false); setAboutOpen(true); }}>About Yept and third-party notices…</button></div>
         </div>
         <div className="dialog-actions">

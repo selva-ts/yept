@@ -65,6 +65,7 @@ const CHANNELS: [string, string, number][] = [
   ['appSettings.get', 'app-settings:get', 0],
   ['appSettings.set', 'app-settings:set', 1],
   ['appSettings.setAppearance', 'app-settings:set-appearance', 1],
+  ['appSettings.setProxyPassword', 'app-settings:set-proxy-password', 1],
   ['runs.start', 'runs:start', 3],
   ['runs.cancel', 'runs:cancel', 1],
   ['runs.saveBody', 'runs:save-body', 2],

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Proxy settings: the system proxy (Windows settings, setup scripts and the usual environment variables), a manual HTTP proxy with a bypass list, or none, with optional Basic sign-in stored encrypted. HTTPS goes through CONNECT tunnels, and Network shows the proxy each request used.
+
 ## 0.9.0
 
 ### Added

@@ -154,6 +154,16 @@ For the installed build, run `dist\Yept-Setup-0.9.0.exe` instead of `npm run dev
 | Open the same collection in Bruno after saving each mode | Bruno shows the same settings, and the AWS profile name is unchanged | |
 | Import a Postman and an Insomnia export using these modes | The modes come across; literal passwords and secret keys are offered as local secrets | |
 
+## H3. Proxies
+
+| Check | Expected | Result |
+|---|---|---|
+| Windows proxy settings with a manual proxy (Settings → Network & internet → Proxy), Yept on *System proxy settings* | Requests go through it; Network shows *system settings*; addresses in the Windows bypass list connect directly | |
+| Windows proxy settings with a setup script (PAC) that sends some hosts DIRECT | Each host follows the script | |
+| A company proxy that needs a username and password | A 407 explains itself; with the sign-in saved, HTTPS and HTTP requests work and the password isn't shown anywhere | |
+| `HTTPS_PROXY` set before starting Yept | It wins over the Windows settings; `NO_PROXY` hosts connect directly | |
+| A company proxy that inspects TLS, its root CA trusted in Windows | HTTPS works without skipping verification | |
+
 ## I. Multipart / form-data uploads
 
 | Check | Expected | Result |
