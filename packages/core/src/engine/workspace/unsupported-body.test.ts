@@ -51,6 +51,24 @@ describe('unsupported body modes', () => {
     expect(saved.slice(saved.indexOf('  body:'), saved.indexOf('settings:'))).toBe(text.slice(text.indexOf('  body:'), text.indexOf('settings:')));
   });
 
+  it.each([
+    ['file', '  "body": # binary fixture\n    type: "file"\n    data: [{selected: true, filePath: "./files/a.bin"}]\n'],
+    ['sparql', '  body: {type: "sparql", data: "SELECT * WHERE { ?s ?p ?o }"}\n'],
+    ['sparql', '  body: # query fixture\n    type: sparql\n    data: |+\n      SELECT * WHERE { ?s ?p ?o }\n\n']
+  ])('keeps the original YAML spelling and CRLF bytes for %s', (mode, block) => {
+    const original = request('placeholder').replace('  body:\nplaceholder\n', block).replaceAll('\n', '\r\n');
+    const item = parseRequestFile(original, 'yml');
+    const doc = toRequestDoc(item);
+    expect(doc.body.unsupported).toBe(mode);
+    const updated = applyRequestDoc(item, { ...doc, url: 'https://api.example.test/other' });
+    const saved = stringifyRequestFile(updated);
+    expect(saved).toContain('url: https://api.example.test/other');
+    expect(saved).toContain(block.replaceAll('\n', '\r\n'));
+    const roundTrip = parseRequestFile(saved, 'yml');
+    expect(roundTrip.request.body.sparql).toBe(item.request.body.sparql);
+    expect(toRequestDoc(roundTrip).body.unsupported).toBe(mode);
+  });
+
   it('choosing another body type replaces it', () => {
     const item = parseRequestFile(FILE_BODY, 'yml');
     const doc = toRequestDoc(item);
@@ -68,5 +86,6 @@ describe('unsupported body modes', () => {
       layers: { collection: [], folders: [], request: [], runtime: {}, environment: emptyEnvLayer() }
     });
     expect(r.result.outcome).toBe('prepare_error');
-    expect(r.result.error?.message).toMatch(/Body type "file" isn't supported/);  });
+    expect(r.result.error?.message).toMatch(/Body type "file" isn't supported/);
+  });
 });
