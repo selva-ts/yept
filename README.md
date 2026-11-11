@@ -25,11 +25,13 @@ The application is MIT licensed, needs no Yept account and has no telemetry. Col
 
 ![A synthetic request and response with network diagnostics in Yept](docs/images/request-diagnostics.png)
 
-Screenshots use an isolated profile and synthetic fixtures. See the [user guide](docs/user-guide.md) for the interface and keyboard shortcuts. To run the same requests and tests in CI with Bruno's CLI, see [running collections in CI](docs/ci.md).
+Screenshots use an isolated profile and synthetic fixtures. See the [user guide](docs/user-guide.md), [Bruno CLI guide](docs/ci.md) and [changelog](CHANGELOG.md).
+
+Website link to be added when the domain is available.
 
 ## Downloads and platform status
 
-This checkout is Yept 0.9.0. A public installer release is not available yet; the source-build steps below are the supported way to try this tree. When release assets are published, use this repository's **Releases** page and read the signing status attached to that version.
+This checkout is Yept 0.9.0. Build from source to try it today. When packages are available, download them from [GitHub Releases](https://github.com/selva-ts/yept/releases).
 
 | Platform | Current status |
 |---|---|
@@ -38,7 +40,18 @@ This checkout is Yept 0.9.0. A public installer release is not available yet; th
 | Linux | No desktop Linux package. |
 | VS Code | Extension prepared for a pre-release on the Visual Studio Marketplace and Open VSX; see [Yept for VS Code](apps/vscode/README.md) and [extension development](apps/vscode/CONTRIBUTING.md). Not published yet. |
 
-See the [code signing policy](docs/code-signing.md). A checksum verifies that a download matches a published file; it does not establish publisher identity. Do not disable operating-system protections to open an unexpected download.
+### Installing
+
+Download the package for your platform and compare its SHA-256 with the entry for that filename in `SHA256SUMS.txt`.
+
+```powershell
+Get-FileHash -Algorithm SHA256 .\Yept-Setup-0.9.0.exe
+```
+
+- **Windows**. Open the installer after the hash matches. If SmartScreen shows **Windows protected your PC** for the unrecognised app, choose **More info**, then **Run anyway** if Windows offers it. [Microsoft SmartScreen guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation)
+- **macOS**. Check the hash with `shasum -a 256`, then open the DMG and drag Yept into Applications. If macOS says the developer cannot be verified, try to open Yept, then choose **System Settings → Privacy & Security → Open Anyway** and confirm. [Apple Gatekeeper guidance](https://support.apple.com/en-gb/102445)
+
+See the [code signing policy](docs/code-signing.md).
 
 ## Build and run from source
 

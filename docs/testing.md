@@ -110,7 +110,8 @@ Each job uploads `out/ci` diagnostics for seven days, including the command logs
 1. Use a reviewed commit already on `main` and an existing tag exactly matching `v` plus the stable version in `package.json`, for example `v0.9.0`. Branch refs, prerelease suffixes, mismatched versions and tags on unmerged commits are rejected.
 2. In Actions, choose **Approved tag packages**, click **Run workflow**, select that version tag in the ref selector and tick the explicit build-approval checkbox. Selecting a branch or leaving approval unticked fails verification.
 3. The verification job checks the manual event, approval, tag, checked-out commit and `origin/main` ancestry. Only a successful verification can call the same Windows/macOS validation and packaging jobs used for pull requests.
-4. Successful tag jobs retain installer/DMG/ZIP files, the project licence and third-party notices as Actions artifacts for one day. Download them before expiry. Artifact retention is not a public release or a signing guarantee.
+4. Successful tag jobs retain installer/DMG/ZIP files, the project licence and third-party notices as Actions artifacts for one day. The release-assets artifact contains the packages and their shared `SHA256SUMS.txt`. Download the files before expiry.
+5. To attach the assets in the workflow, create a draft release for the tag before running it and select **attach-to-draft**. Review the attached files and checksums before publishing the release yourself.
 
 GitHub Free does not provide required-reviewer environment gates for private repositories. The manual dispatch and explicit checkbox are the current approval mechanism, rather than an independent reviewer gate. See [GitHub's environment availability](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments) and the [code signing policy](code-signing.md). A different approval mechanism requires an explicit configuration change.
 
