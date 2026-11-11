@@ -4,6 +4,14 @@
   "private": true,
   "license": "MIT",
   "description": "Free, local-first, Git-native desktop API client built on Bruno's open-source packages",
+  "homepage": "https://github.com/selva-ts/yept#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/selva-ts/yept.git"
+  },
+  "bugs": {
+    "url": "https://github.com/selva-ts/yept/issues"
+  },
   "engines": {
     "node": ">=22"
   },
