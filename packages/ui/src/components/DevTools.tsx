@@ -205,7 +205,9 @@ function ConnectionView({ hop }: { hop: NetworkHop }): React.JSX.Element {
           ['Valid', `${cert.validFrom} → ${cert.validTo}`],
           ['SHA-256 fingerprint', cert.fingerprint256]
         ] as [string, string][])
-      : [])
+      : []),
+    // Offered when the server asks; servers that don't ask never see it.
+    ...(c.tls?.clientCertificate ? ([['Client certificate', c.tls.clientCertificate]] as [string, string][]) : [])
   ];
   return (
     <table className="headers-list">

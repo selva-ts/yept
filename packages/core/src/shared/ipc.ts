@@ -212,6 +212,10 @@ export interface YeptApi {
     preview: (requestId: string, doc: RequestDoc) => Promise<RequestPreview>;
     /** Shows a file picker for a PEM CA certificate. */
     pickCaFile: () => Promise<string | null>;
+    /** Stores a client certificate's passphrase encrypted on this machine, or removes it (null). Never read back. */
+    setCertPassphrase: (collectionId: string, env: string, host: string, passphrase: string | null) => Promise<EnvironmentList>;
+    /** Shows a file picker for a client certificate (PFX or PEM) or its PEM key. */
+    pickCertFile: (kind: 'certificate' | 'key') => Promise<string | null>;
   };
 
   history: {

@@ -16,6 +16,10 @@ import { mediaBytes } from '@yept/core/services/media-bytes';
 import type { AppMetrics, MutationResult, OAuth2TokenAction } from '@yept/core/shared/ipc';
 import { APPEARANCE_KEYS, type Appearance, type AppSettings, type CookieView, type Environment, type GitFile, type RequestDoc, type SettingsDoc, type TlsSettings } from '@yept/core/shared/model';
 
+const certDialog = (kind: unknown) => kind === 'key'
+  ? { title: 'Choose the private key (PEM)', properties: ['openFile' as const], filters: [{ name: 'Private keys', extensions: ['key', 'pem'] }, { name: 'All files', extensions: ['*'] }] }
+  : { title: 'Choose a client certificate (PFX or PEM)', properties: ['openFile' as const], filters: [{ name: 'Certificates', extensions: ['pfx', 'p12', 'pem', 'crt', 'cer'] }, { name: 'All files', extensions: ['*'] }] };
+
 export function createHandlers(host: AppHost): { handlers: HandlerRegistry; close: () => Promise<void>; settings: () => AppSettings } {
   const handlers = new HandlerRegistry();
   const handle = <A extends unknown[], R>(channel: string, fn: (...args: A) => Promise<R> | R): void => handlers.register(channel, fn);
@@ -81,6 +85,11 @@ export function createHandlers(host: AppHost): { handlers: HandlerRegistry; clos
   handle('env:set-runtime', (c: string, e: string, n: string, v: string) => env.setRuntime(c, e, n, v));
   handle('env:clear-runtime', (c: string, e: string) => env.clearRuntime(c, e));
   handle('env:preview', async (requestId: string, doc: RequestDoc) => env.requestPreview(await ws().requestContext(requestId), doc));
+  handle('env:set-cert-passphrase', (c: string, e: string, h: string, p: string | null) => env.setCertPassphrase(c, e, h, typeof p === 'string' ? p : null));
+  handle('env:pick-cert-file', async (kind: unknown) => {
+    const r = await host.openDialog(certDialog(kind));
+    return r.canceled ? null : (r.filePaths[0] ?? null);
+  });
   handle('env:pick-ca-file', async () => {
     const opts = { title: 'Choose a CA certificate (PEM)', properties: ['openFile' as const], filters: [{ name: 'Certificates', extensions: ['pem', 'crt', 'cer'] }] };
     const r = await host.openDialog(opts);

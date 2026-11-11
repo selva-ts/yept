@@ -40,6 +40,10 @@ export function environment(value: unknown): asserts value is Environment {
 }
 export function tlsSettings(value: unknown): asserts value is TlsSettings {
   if (!object(value) || typeof value.skipVerify !== 'boolean' || typeof value.caFile !== 'string') throw new Error('Invalid TLS settings');
+  const certs = value.clientCertificates;
+  if (certs !== undefined && (!Array.isArray(certs) || certs.length > 50 || !certs.every((c) => object(c) && ['host', 'pfxFile', 'certFile', 'keyFile'].every((k) => typeof c[k] === 'string')))) {
+    throw new Error('Invalid TLS settings');
+  }
 }
 export function cookieKey(value: unknown): asserts value is Pick<CookieView, 'domain' | 'path' | 'name'> {
   if (!object(value) || !['domain', 'path', 'name'].every((k) => typeof value[k] === 'string')) throw new Error('Invalid cookie');

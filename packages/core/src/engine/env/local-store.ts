@@ -3,7 +3,7 @@
 // environment per collection, and TLS settings per environment.
 import { readFileSync, existsSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { TlsSettings } from '../../shared/model';
+import type { ClientCertificate, TlsSettings } from '../../shared/model';
 
 export interface Cipher {
   encrypt(plain: string): string;
@@ -15,6 +15,8 @@ interface EnvLocal {
   /** Encrypted with the cipher. */
   secrets: Record<string, string>;
   tls: TlsSettings;
+  /** Client certificate passphrases by host pattern, encrypted with the cipher. */
+  certPassphrases?: Record<string, string>;
 }
 
 interface CollectionLocal {
@@ -132,11 +134,45 @@ export class LocalStore {
   }
 
   tls(collectionDir: string, env: string): TlsSettings {
-    return { ...DEFAULT_TLS, ...this.env(collectionDir, env).tls };
+    const e = this.env(collectionDir, env);
+    const out: TlsSettings = { ...DEFAULT_TLS, ...e.tls };
+    if (out.clientCertificates) out.clientCertificates = out.clientCertificates.map((c) => ({ ...c, hasPassphrase: !!e.certPassphrases?.[c.host] }));
+    return out;
   }
 
   setTls(collectionDir: string, env: string, tls: TlsSettings): void {
-    this.env(collectionDir, env).tls = { ...tls };
+    const e = this.env(collectionDir, env);
+    const certs: ClientCertificate[] = [];
+    for (const c of tls.clientCertificates ?? []) {
+      const host = String(c.host ?? '').trim();
+      if (!host || certs.some((x) => x.host === host)) continue;
+      certs.push({ host, pfxFile: String(c.pfxFile ?? ''), certFile: String(c.certFile ?? ''), keyFile: String(c.keyFile ?? '') });
+    }
+    e.tls = { skipVerify: !!tls.skipVerify, caFile: String(tls.caFile ?? ''), ...(certs.length ? { clientCertificates: certs } : {}) };
+    // A passphrase goes with its certificate.
+    for (const host of Object.keys(e.certPassphrases ?? {})) if (!certs.some((c) => c.host === host)) delete e.certPassphrases![host];
+    this.save();
+  }
+
+  /** Decrypted client certificate passphrases by host pattern. Only the main process ever holds these. */
+  certPassphrases(collectionDir: string, env: string): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const [host, v] of Object.entries(this.env(collectionDir, env).certPassphrases ?? {})) {
+      try {
+        out[host] = this.cipher.decrypt(v);
+      } catch {
+        // Undecryptable here: treat as missing.
+      }
+    }
+    return out;
+  }
+
+  setCertPassphrase(collectionDir: string, env: string, host: string, passphrase: string | undefined): void {
+    const e = this.env(collectionDir, env);
+    if (!e.tls.clientCertificates?.some((c) => c.host === host)) throw new Error(`No client certificate for ${host} in this environment`);
+    e.certPassphrases ??= {};
+    if (passphrase) e.certPassphrases[host] = this.cipher.encrypt(passphrase);
+    else delete e.certPassphrases[host];
     this.save();
   }
 

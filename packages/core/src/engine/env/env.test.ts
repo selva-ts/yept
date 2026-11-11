@@ -36,6 +36,27 @@ describe('LocalStore', () => {
     expect(readFileSync(path, 'utf8')).not.toContain('hunter2-very-secret');
   });
 
+  it('keeps client certificates with their passphrases encrypted, dropping a passphrase with its certificate', () => {
+    const path = join(dir, 'local.json');
+    const s = new LocalStore(path, cipher);
+    const pfx = { host: '*.example.test', pfxFile: 'C:\\certs\\client.pfx', certFile: '', keyFile: '' };
+    const pem = { host: 'api.example.test:8443', pfxFile: '', certFile: 'C:\\certs\\client.pem', keyFile: 'C:\\certs\\client.key' };
+    // Blank and repeated hosts are dropped; hasPassphrase from the page is ignored.
+    s.setTls('/c', 'dev', { skipVerify: false, caFile: '', clientCertificates: [pfx, { ...pfx, host: ' ' }, { ...pem, hasPassphrase: true }, pem] });
+    expect(() => s.setCertPassphrase('/c', 'dev', 'other.example.test', 'x')).toThrow('No client certificate for other.example.test');
+    s.setCertPassphrase('/c', 'dev', '*.example.test', 'sample-pfx-passphrase');
+
+    const again = new LocalStore(path, cipher);
+    expect(again.tls('/c', 'dev').clientCertificates).toEqual([{ ...pfx, hasPassphrase: true }, { ...pem, hasPassphrase: false }]);
+    expect(again.certPassphrases('/c', 'dev')).toEqual({ '*.example.test': 'sample-pfx-passphrase' });
+    expect(readFileSync(path, 'utf8')).not.toContain('sample-pfx-passphrase');
+
+    again.setTls('/c', 'dev', { skipVerify: false, caFile: '', clientCertificates: [pem] });
+    expect(again.certPassphrases('/c', 'dev')).toEqual({});
+    again.setTls('/c', 'dev', { skipVerify: false, caFile: '' });
+    expect(again.tls('/c', 'dev').clientCertificates).toBeUndefined();
+  });
+
   it('renames and deletes environments, and clears secrets with undefined', () => {
     const s = new LocalStore(join(dir, 'local.json'), cipher);
     s.setSecrets('/c', 'dev', { token: 'abc12345', other: 'x' });

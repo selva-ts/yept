@@ -49,7 +49,9 @@ export function createApi(invoke: Invoke, subscribe: Subscribe): YeptApi {
       setRuntime: (c, e, n, v) => invoke('env:set-runtime', c, e, n, v),
       clearRuntime: (c, e) => invoke('env:clear-runtime', c, e),
       preview: (id, doc) => invoke('env:preview', id, doc),
-      pickCaFile: () => invoke('env:pick-ca-file')
+      pickCaFile: () => invoke('env:pick-ca-file'),
+      setCertPassphrase: (c, e, h, p) => invoke('env:set-cert-passphrase', c, e, h, p),
+      pickCertFile: (kind) => invoke('env:pick-cert-file', kind)
     },
     history: {
       list: (requestId) => invoke('history:list', requestId),

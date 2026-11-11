@@ -38,6 +38,8 @@ const CHANNELS: [string, string, number][] = [
   ['env.clearRuntime', 'env:clear-runtime', 2],
   ['env.preview', 'env:preview', 2],
   ['env.pickCaFile', 'env:pick-ca-file', 0],
+  ['env.setCertPassphrase', 'env:set-cert-passphrase', 4],
+  ['env.pickCertFile', 'env:pick-cert-file', 1],
   ['history.list', 'history:list', 1],
   ['history.get', 'history:get', 1],
   ['history.remove', 'history:remove', 1],

@@ -2,12 +2,119 @@
 // (committed to Git), and this machine's overrides, secrets and TLS settings (never committed).
 import { useEffect, useMemo, useState } from 'react';
 import type { EnvironmentList } from '@shared/ipc';
-import type { Environment, EnvironmentView, EnvVariable } from '@shared/model';
+import type { ClientCertificate, Environment, EnvironmentView, EnvVariable } from '@shared/model';
 import { errorMessage, yept } from '../api';
 import { useStore } from '../store';
 import { confirm, prompt } from './Dialogs';
 
 const toShared = (e: EnvironmentView): Environment => ({ name: e.name, variables: e.variables.map(({ name, value, secret, enabled }) => ({ name, value, secret, enabled })) });
+
+const fileName = (path: string): string => path.split(/[\\/]/).pop() ?? path;
+const isPfx = (path: string): boolean => /\.(pfx|p12)$/i.test(path);
+
+/** Client certificates for this environment on this machine: host pattern, files, and an encrypted passphrase. */
+function ClientCertificates({ collectionId, env }: { collectionId: string; env: EnvironmentView }): React.JSX.Element {
+  const { setEnvs, toast } = useStore();
+  const empty = { host: '', pfxFile: '', certFile: '', keyFile: '', passphrase: '' };
+  const [adding, setAdding] = useState<typeof empty | null>(null);
+  const certs = env.tls.clientCertificates ?? [];
+  const run = async (fn: () => Promise<EnvironmentList>): Promise<boolean> => {
+    try {
+      setEnvs(await fn());
+      return true;
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+      return false;
+    }
+  };
+  const withCerts = (list: ClientCertificate[]) => ({ ...env.tls, clientCertificates: list.map(({ host, pfxFile, certFile, keyFile }) => ({ host, pfxFile, certFile, keyFile })) });
+  const pickCertificate = async (): Promise<void> => {
+    const f = await yept.env.pickCertFile('certificate');
+    if (f && adding) setAdding({ ...adding, ...(isPfx(f) ? { pfxFile: f, certFile: '', keyFile: '' } : { certFile: f, pfxFile: '' }) });
+  };
+  const pickKey = async (): Promise<void> => {
+    const f = await yept.env.pickCertFile('key');
+    if (f && adding) setAdding({ ...adding, keyFile: f });
+  };
+  const host = adding?.host.trim() ?? '';
+  const duplicate = !!host && certs.some((c) => c.host === host);
+  const ready = !!adding && !!host && !duplicate && (!!adding.pfxFile || (!!adding.certFile && !!adding.keyFile));
+  const add = async (): Promise<void> => {
+    if (!adding || !ready) return;
+    const { passphrase, ...cert } = { ...adding, host };
+    if (!(await run(() => yept.env.setTls(collectionId, env.name, withCerts([...certs, cert]))))) return;
+    if (passphrase) await run(() => yept.env.setCertPassphrase(collectionId, env.name, host, passphrase));
+    setAdding(null);
+  };
+  return (
+    <div className="client-certs">
+      <div className="field-row" style={{ alignItems: 'flex-start' }}>
+        <span className="field-label">Client certificates</span>
+        <span className="mute small">Offered to servers that ask for one (mutual TLS). The files stay where they are; passphrases are stored encrypted on this machine.</span>
+      </div>
+      {certs.length > 0 && (
+        <table className="headers-list" aria-label="Client certificates">
+          <tbody>
+            {certs.map((c) => (
+              <tr key={c.host}>
+                <td className="mono">{c.host}</td>
+                <td className="mono small" title={c.pfxFile || `${c.certFile}\n${c.keyFile}`}>{c.pfxFile ? fileName(c.pfxFile) : `${fileName(c.certFile)} + ${fileName(c.keyFile)}`}</td>
+                <td>
+                  <input className="input" type="password" style={{ width: 170 }} aria-label={`Passphrase for ${c.host}`} autoComplete="new-password"
+                    placeholder={c.hasPassphrase ? '•••••• stored · type to replace' : 'no passphrase'}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                    onBlur={(e) => {
+                      const v = e.target.value;
+                      if (v) void run(() => yept.env.setCertPassphrase(collectionId, env.name, c.host, v)).then(() => { e.target.value = ''; });
+                    }} />
+                  {c.hasPassphrase && <button className="btn ghost small" onClick={() => void run(() => yept.env.setCertPassphrase(collectionId, env.name, c.host, null))}>Clear</button>}
+                </td>
+                <td style={{ textAlign: 'right' }}>
+                  <button className="btn ghost small" title={`Remove the certificate for ${c.host}`} aria-label={`Remove the certificate for ${c.host}`}
+                    onClick={() => void run(() => yept.env.setTls(collectionId, env.name, withCerts(certs.filter((x) => x.host !== c.host))))}>
+                    ×
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {adding ? (
+        <div className="client-cert-add" style={{ display: 'grid', gap: 6, margin: '6px 0' }}>
+          <label className="field-row">
+            <span className="field-label">Host</span>
+            <input className="input mono" aria-label="Certificate host" placeholder="api.example.test or *.example.test" value={adding.host} onChange={(e) => setAdding({ ...adding, host: e.target.value })} />
+          </label>
+          {duplicate && <span className="warn-text small">This environment already has a certificate for {host}.</span>}
+          <div className="field-row">
+            <span className="field-label">Certificate</span>
+            <span className="mono small" style={{ flex: 1 }}>{adding.pfxFile || adding.certFile ? fileName(adding.pfxFile || adding.certFile) : 'none chosen'}</span>
+            <button className="btn small" onClick={() => void pickCertificate()}>Choose…</button>
+          </div>
+          {adding.certFile && (
+            <div className="field-row">
+              <span className="field-label">Private key</span>
+              <span className="mono small" style={{ flex: 1 }}>{adding.keyFile ? fileName(adding.keyFile) : 'none chosen'}</span>
+              <button className="btn small" onClick={() => void pickKey()}>Choose key…</button>
+            </div>
+          )}
+          <label className="field-row">
+            <span className="field-label">Passphrase</span>
+            <input className="input" type="password" autoComplete="new-password" aria-label="Certificate passphrase" placeholder="if the file has one" value={adding.passphrase} onChange={(e) => setAdding({ ...adding, passphrase: e.target.value })} />
+          </label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn small primary" disabled={!ready} onClick={() => void add()}>Add certificate</button>
+            <button className="btn small" onClick={() => setAdding(null)}>Cancel</button>
+          </div>
+          <span className="mute small">A PFX (.pfx, .p12) holds the certificate and key; a PEM certificate (.pem, .crt) needs its key file too. *.example.test covers subdomains; add :port to limit it to one port.</span>
+        </div>
+      ) : (
+        <button className="btn small" style={{ margin: '6px 0' }} onClick={() => setAdding(empty)}>+ Add client certificate</button>
+      )}
+    </div>
+  );
+}
 
 function LocalCell({ collectionId, env, v }: { collectionId: string; env: string; v: EnvironmentView['variables'][number] }): React.JSX.Element {
   const { setEnvs, toast } = useStore();
@@ -232,6 +339,7 @@ export function EnvEditor(): React.JSX.Element | null {
                     </button>
                   )}
                 </div>
+                <ClientCertificates collectionId={cid} env={current} />
                 <p className="mute small">
                   Shared values are saved to <code>{current.path}</code> and committed with Git. Overrides, secrets and TLS settings stay on this machine, encrypted where secret.
                 </p>
