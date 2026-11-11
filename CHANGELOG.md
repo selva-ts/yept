@@ -1,13 +1,6 @@
 # Changelog
 
-## Unreleased
-
-### Added
-
-- Proxy settings: the system proxy (Windows settings, setup scripts and the usual environment variables), a manual HTTP proxy with a bypass list, or none, with optional Basic sign-in stored encrypted. HTTPS goes through CONNECT tunnels, and Network shows the proxy each request used.
-- Client certificates for mutual TLS: a PFX, or a PEM certificate and key, per environment and host pattern, kept on this computer with the passphrase encrypted. Network shows the certificate's subject.
-
-## 0.9.0
+## 0.9.0 - 2026-11-11
 
 ### Added
 
@@ -19,6 +12,8 @@
 - Response tools for filtering JSON, setting variables and secrets, saving response files, previewing media and comparing runs.
 - VS Code extension source with shared request editing, sending and collection-runner support.
 - Instructions for running collections in CI with Bruno CLI.
+- Proxy settings: the system proxy (Windows settings, setup scripts and the usual environment variables), a manual HTTP proxy with a bypass list, or none, with optional Basic sign-in stored encrypted. HTTPS goes through CONNECT tunnels, and Network shows the proxy each request used.
+- Client certificates for mutual TLS: a PFX, or a PEM certificate and key, per environment and host pattern, kept on this computer with the passphrase encrypted. Network shows the certificate's subject.
 
 ### Changed
 
@@ -28,3 +23,4 @@
 
 - Windows packaging checks now keep CI logs out of the app.
 - Script and UI checks tolerate busy build machines more reliably.
+- After an import or a .bru conversion, the app opens the new collection reliably instead of sometimes staying on the old one.
