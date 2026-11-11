@@ -1,6 +1,13 @@
 # Yept user guide
 
-Yept stores collection requests and non-secret environment values as Bruno OpenCollection YAML files. Your secrets, response history and personal TLS settings stay on your computer. Use your normal Git tool to clone the shared collections repository before opening it in Yept. The installer is currently unsigned, so Windows may show a SmartScreen warning; on macOS follow [macos-build.md](macos-build.md). On a Mac, use ⌘ wherever this guide says Ctrl.
+Yept stores collection requests and non-secret environment values as Bruno OpenCollection YAML files. Your secrets, response history and personal TLS settings stay on your computer. Use your normal Git tool to clone the shared collections repository before opening it in Yept. On a Mac, use ⌘ wherever this guide says Ctrl.
+
+## Installing
+
+Download the package for your platform and `SHA256SUMS.txt` from [GitHub Releases](https://github.com/selva-ts/yept/releases) when available. Compare the hash for the exact filename before opening the package. On Windows, run `Get-FileHash -Algorithm SHA256 .\Yept-Setup-0.9.0.exe` in PowerShell. On macOS, run `shasum -a 256` followed by the downloaded file's path.
+
+- **Windows**. If SmartScreen warns that the unsigned installer is unrecognised, choose **More info**, then **Run anyway** if offered. [Microsoft SmartScreen guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation)
+- **macOS**. Open the DMG, move Yept to Applications, then try to open it. For an unidentified developer warning, choose **System Settings → Privacy & Security → Open Anyway** and confirm. [Apple Gatekeeper guidance](https://support.apple.com/en-gb/102445)
 
 ## 1. Open a collection
 

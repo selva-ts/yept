@@ -8,6 +8,10 @@ on:
         required: true
         type: boolean
         default: false
+      attach-to-draft:
+        description: Attach packages and SHA256SUMS.txt to the existing draft release for this tag.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -45,3 +49,77 @@ jobs:
     uses: ./.github/workflows/ci.yml
     with:
       upload-packages: true
+
+  checksums:
+    name: Prepare release assets and checksums
+    needs: packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+    outputs:
+      artifact-id: ${{ steps.assets.outputs.artifact-id }}
+    steps:
+      - name: Download approved packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: packages-*-${{ github.ref_name }}-*
+          path: packages
+
+      - name: Write SHA256SUMS.txt
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version="${RELEASE_TAG#v}"
+          latest_package() {
+            find packages -mindepth 1 -maxdepth 1 -type d -name "packages-$1-${RELEASE_TAG}-*" | sort -V | tail -n 1
+          }
+          mkdir release-assets
+          win_dir="$(latest_package win-x64)"
+          test -n "$win_dir"
+          cp "$win_dir/dist/Yept-Setup-${version}.exe" release-assets/
+          for arch in arm64 x64; do
+            mac_dir="$(latest_package "mac-$arch")"
+            test -n "$mac_dir"
+            cp "$mac_dir/dist/Yept-${version}-mac-${arch}.dmg" "$mac_dir/dist/Yept-${version}-mac-${arch}.zip" release-assets/
+          done
+          cd release-assets
+          sha256sum -- *.exe *.dmg *.zip > SHA256SUMS.txt
+
+      - name: Retain release assets
+        id: assets
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-assets-${{ github.ref_name }}-${{ github.run_attempt }}
+          path: release-assets/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+  attach:
+    name: Attach assets to the draft release
+    needs: checksums
+    if: ${{ inputs.attach-to-draft }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.checksums.outputs.artifact-id }}
+          path: release-assets
+
+      - name: Upload to the existing draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [ "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" != true ]; then
+            echo "Create a draft release for $RELEASE_TAG before attaching assets."
+            exit 1
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/*
