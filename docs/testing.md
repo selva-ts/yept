@@ -12,7 +12,7 @@ Run `npm test --workspace yept-vscode` at the repository root, or `npm test` ins
 | Licences | `npm run check:licenses` | Offline declaration policy, licence text and source checksums, package versions, project copyright and generated notice coverage. |
 | Engine unit tests | `npm test` | Workspace and files, identity, variables and environments, runner pipeline, network recording (hops, timings, TLS details), cookie jars and `bru.cookies`, sandbox, `bru.sendRequest` (call and return shapes, scripts converted from Postman, limits, cancel), history and redaction, Digest/NTLM/AWS Signature v4 auth (MD4 against RFC 1320, NTLMv2 against MS-NLMP 4.2.4, Digest against RFC 2617 and 7616, SigV4 against cases from the AWS test suite, and each mode sent to the fixture server, inherited and in a collection run), the collection runner (tree order, judging and counting results, stop on failure, cancel, a login → create → read → delete run through the pipeline, iterations, delay and cancel during it, CSV and JSON data files and their edge cases, row values over environment values for one iteration only, JUnit XML that is well formed and escaped, HTML reports with no secret values or outside assets), Git, leak check, import/export, URL params, cURL export, code snippets for the other languages (quoting and escaping per language, masked values kept masked; `snippets-run.test.ts` runs the fetch and axios snippets on Node against the fixture server, and the Python, PowerShell 7 and C# ones where `requests`, `pwsh` or the .NET 10 SDK is installed, skipping them otherwise) and a corpus of pasted cURL commands (bash and Windows cmd) read back into requests. |
 | End-to-end | `npm run e2e` | Builds the app, then drives the real Electron app with Playwright. |
-| Packaged app | `Yept --self-test` | Headless checks inside the installed build. |
+| Packaged app | `node scripts/ci.mjs package` | Headless checks and the About screen in the Windows build, with isolated profiles. |
 | By hand | [ui-test-checklist.md](ui-test-checklist.md) | Looks, keyboard, accessibility, Windows/macOS integration. |
 
 ## Unit tests (Vitest)
@@ -72,10 +72,10 @@ The OAuth2 fixture's `GET /auth/authorize` issues a one-time code bound to the r
 
 ```bash
 npm run package:win
-dist/win-unpacked/Yept.exe --self-test
+node scripts/ci.mjs package
 ```
 
-The self-test checks `node:sqlite`, a YAML round-trip, the OS certificate bundle, the script sandbox (including `bru.sendRequest` through the packaged stand-in, stopping a runaway script and `bru.cookies` on a cookie jar), the import converters and Git, and exits non-zero on failure. To run the About check against the packaged app, set `YEPT_PACKAGED_EXE` to the full path of `Yept.exe` and run `node e2e/about.mjs`.
+The helper runs the packaged executable with `--self-test` and a temporary user-data folder. The self-test checks `node:sqlite`, a YAML round-trip, the OS certificate bundle, the script sandbox (including `bru.sendRequest` through the packaged stand-in, stopping a runaway script and `bru.cookies` on a cookie jar), the import converters and Git, and exits non-zero on failure. The helper also opens About in the packaged app.
 
 For macOS, see [macos-build.md](macos-build.md).
 
