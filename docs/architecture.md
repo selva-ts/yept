@@ -113,6 +113,13 @@ The request pipeline (prepare → interpolate → scripts → send → variables
 - **What's shown**: the runner asks the router before sending, so a bad setting stops the send with an explanation, and the Timeline's *Request sent* line ends *via proxy host:port*. Each hop's connection has the proxy and its source (*manual proxy*, *system settings*, *environment variable*); for a tunnel, the connect time covers reaching the proxy and its answer to CONNECT. `Proxy-Authorization` is masked like `Authorization` and never copied into Copy as cURL, code snippets or raw HTTP. Errors name the proxy: unreachable, a refused CONNECT with its status, or a 407 with or without credentials.
 - **VS Code**: the extension host already routes requests through VS Code's proxy support, so the extension's run service passes no router.
 
+## Client certificates
+
+- **Settings** (`TlsSettings.clientCertificates`, local to the machine, per collection and environment): a host pattern, and either a PFX file or a PEM certificate and key file. Only paths are stored; passphrases are encrypted in `local-environments.json` by host pattern and dropped with their certificate. The page only learns whether a passphrase is stored. Bruno's collection-level `clientCertificates` block is kept unchanged but not used.
+- **Loading** (`packages/core/src/engine/net/client-certs.ts`): each run reads the files and builds a TLS context once, so a missing file, a wrong or missing passphrase, a key that doesn't belong to the certificate or a file that isn't PFX or PEM stops the send with an explanation (Node's OpenSSL and Electron's BoringSSL messages are both translated).
+- **Sending**: the HTTPS agent picks the first certificate whose pattern covers the host and port (`api.example.test` exactly, `*.example.test` its subdomains, `:port` one port) for each new connection, direct or through a proxy tunnel. Agents are cached by TLS settings, certificates included. The server decides whether to ask; the certificate isn't sent otherwise. The proxy itself never gets it.
+- **Shown**: each hop's connection has the subject of the certificate offered (never the key). A TLS alert that the server needs a certificate, or didn't accept the one sent, becomes a plain message.
+
 ## OAuth2
 
 - **File format:** Bruno's `oauth2` auth supports `client_credentials`, `authorization_code` and `resource_owner_password_credentials`. Yept keeps the other fields in the auth block. Imported literal OAuth2 credentials become environment-local secrets and the shared files contain variable references.
@@ -219,7 +226,7 @@ Runs every request under a collection or folder, one at a time, and reports a re
 
 | Windows | macOS | Contents |
 |---|---|---|
-| `%APPDATA%\yept` | `~/Library/Application Support/yept` | `settings.json` (proxy password encrypted), `preferences.json`, `local-environments.json` (secrets encrypted), `cookies.json` (persistent cookies, encrypted), `history.db`, `identity.db` |
+| `%APPDATA%\yept` | `~/Library/Application Support/yept` | `settings.json` (proxy password encrypted), `preferences.json`, `local-environments.json` (secrets and client certificate passphrases encrypted), `cookies.json` (persistent cookies, encrypted), `history.db`, `identity.db` |
 
 Data from the previous name (folder `getnect`) or from pre-release builds (folder `vela`) is copied once on first launch; the old folder is left untouched.
 
@@ -246,6 +253,7 @@ Data from the previous name (folder `getnect`) or from pre-release builds (folde
 - Response tools: the filter is JSONPath only (no jq, no functions such as `length()` or `match()`, no regular expressions in filters) and works on JSON bodies in Pretty under the 2 MB format limit. Responses can't be edited. History comparison is between two runs of the same request, and uses the redacted, possibly truncated copies history keeps. Image and PDF preview stops at 20 MB and 30 PDF pages; PDF pages are pictures, so text can't be selected, links and forms don't work, fonts the PDF doesn't embed fall back to system fonts, and images that need pdf.js's WebAssembly decoders (JPEG 2000, JBIG2) are missing. TIFF and other image types Chromium can't draw are not previewed.
 - The Body tab shows Bruno's binary file (`body.type: file`) and SPARQL bodies as read-only. Editing other fields keeps the original YAML body bytes. Converting a `.bru` collection preserves its binary file variants and SPARQL query in the YAML copy. Sending stops with an explanation until you choose a supported body type. Choosing one replaces the original body on save.
 - **Copy as** code: PowerShell's `-Form` (multipart) needs PowerShell 7 and sends files as `application/octet-stream` under their name on disk; JavaScript `FormData` can't give a text field a content type; `fetch` can't send a body with GET or HEAD. The snippets say so in a comment where it applies. .NET (C# and PowerShell) refuses header values outside ASCII by default: the C# snippet sends them as Latin-1, as Yept does, and PowerShell has no option for it.
+- Client certificates: files only, no Windows certificate store or smart cards; the VS Code extension's requests go through VS Code's proxy support, which hasn't been checked with client certificates.
 - Proxies: HTTP and HTTPS proxies with Basic sign-in only; no SOCKS, and no NTLM, Kerberos or Digest proxy sign-in. Only the first usable entry of a system (PAC) answer is tried, with no fallback to the next. A collection file's own Bruno `proxy` block is kept unchanged but not used: the machine's settings decide.
 - Auth: no Kerberos/Negotiate, no Digest `auth-int`, no NTLMv1. AWS Signature v4 doesn't read AWS profiles or AWS credentials from the environment, and doesn't make presigned (query-string) URLs. Copy as cURL with secrets copies the Digest or NTLM header that was sent, which the server won't accept a second time.
 - Installers are unsigned (Windows SmartScreen warns; macOS needs the steps in [macos-build.md](macos-build.md)).

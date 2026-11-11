@@ -66,6 +66,16 @@ function certificate(s: TLSSocket): CertificateInfo | undefined {
   }
 }
 
+/** The subject of the certificate this side offered (mutual TLS), never its key. */
+function clientCertificate(s: TLSSocket): string | undefined {
+  try {
+    const c = s.getCertificate();
+    return c && 'subject' in c ? describeName(c.subject) || undefined : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * `dialled` is where the request connected (host or looked-up IP, and port): sockets don't always report their peer.
  * Through a proxy, the remote address is the proxy's.
@@ -79,7 +89,11 @@ function connectionOf(socket: Socket | null | undefined, dialled: { address?: st
   }
   if (!socket) return info;
   const t = socket as TLSSocket;
-  if (t.encrypted) info.tls = { protocol: t.getProtocol() ?? '', cipher: t.getCipher()?.name ?? '', certificate: certificate(t) };
+  if (t.encrypted) {
+    info.tls = { protocol: t.getProtocol() ?? '', cipher: t.getCipher()?.name ?? '', certificate: certificate(t) };
+    const own = clientCertificate(t);
+    if (own) info.tls.clientCertificate = own;
+  }
   return info;
 }
 

@@ -6,6 +6,7 @@ import { promises as fs } from 'node:fs';
 import { LocalStore } from '@yept/core/engine/env/local-store';
 import { emptyEnvLayer, resolveLayers, type VarLayers } from '@yept/core/engine/env/variables';
 import { caFileAnchors } from '@yept/core/engine/net/ca';
+import { loadClientCertificates, type LoadedClientCertificate } from '@yept/core/engine/net/client-certs';
 import type { VariableUpdates } from '@yept/core/engine/runner/runner';
 import type { RequestContext, Workspace } from '@yept/core/engine/workspace/workspace';
 import type { EnvironmentList, RequestPreview } from '@yept/core/shared/ipc';
@@ -19,7 +20,7 @@ export interface RunEnvironment {
   environment: string;
   layers: VarLayers;
   secretNames: string[];
-  tls: { skipVerify: boolean; ca?: string[] };
+  tls: { skipVerify: boolean; ca?: string[]; clientCertificates?: LoadedClientCertificate[] };
 }
 
 export class EnvService {
@@ -107,6 +108,12 @@ export class EnvService {
     return this.local().secrets(this.ws().collectionDir(collectionId), env)[name] ?? null;
   }
 
+  /** Stores a client certificate's passphrase encrypted, or removes it (null). It is never read back to the page. */
+  setCertPassphrase(collectionId: string, env: string, host: string, passphrase: string | null): EnvironmentList {
+    this.local().setCertPassphrase(this.ws().collectionDir(collectionId), env, host, passphrase ?? undefined);
+    return this.list(collectionId);
+  }
+
   setTls(collectionId: string, env: string, tls: TlsSettings): EnvironmentList {
     this.local().setTls(this.ws().collectionDir(collectionId), env, tls);
     return this.list(collectionId);
@@ -186,10 +193,13 @@ export class EnvService {
         throw new Error(`Can't use the CA certificate file for "${environment}": ${(e as Error).message}`);
       }
     }
+    const clientCertificates = environment && tls.clientCertificates?.length
+      ? await loadClientCertificates(tls.clientCertificates, local.certPassphrases(dir, environment))
+      : undefined;
     return {
       environment,
       secretNames: (env?.variables ?? []).filter((v) => v.secret).map((v) => v.name),
-      tls: { skipVerify: tls.skipVerify, ca },
+      tls: { skipVerify: tls.skipVerify, ca, clientCertificates },
       layers: {
         collection: ctx.collection.vars,
         environment: layer,

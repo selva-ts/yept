@@ -257,6 +257,19 @@ export interface TlsSettings {
   skipVerify: boolean;
   /** Extra CA certificate file (PEM) to trust, e.g. a company root. */
   caFile: string;
+  /** Certificates this machine presents to servers that ask for one (mutual TLS). */
+  clientCertificates?: ClientCertificate[];
+}
+
+/** A client certificate for the hosts matching `host`: a PFX/PKCS#12 file, or a PEM certificate with its key. */
+export interface ClientCertificate {
+  /** `api.example.test`, `*.example.test` (subdomains) or either with `:port`. */
+  host: string;
+  pfxFile: string;
+  certFile: string;
+  keyFile: string;
+  /** Whether a passphrase is stored. It is kept encrypted and never reaches the page. */
+  hasPassphrase?: boolean;
 }
 
 export type VarSource = 'collection' | 'environment' | 'override' | 'secret' | 'folder' | 'request' | 'runtime' | 'session';
@@ -426,7 +439,7 @@ export interface ConnectionInfo {
   proxy?: string;
   /** Where that proxy came from. */
   proxySource?: ProxySource;
-  tls?: { protocol: string; cipher: string; certificate?: CertificateInfo };
+  tls?: { protocol: string; cipher: string; certificate?: CertificateInfo; /** Subject of the client certificate offered, if any. */ clientCertificate?: string };
 }
 
 /** One request on the wire. Header values are masked like RunResult.request. */

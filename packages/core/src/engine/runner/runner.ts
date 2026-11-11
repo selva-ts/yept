@@ -14,6 +14,7 @@ import axios, { type AxiosError, type AxiosResponse } from 'axios';
 import { interpolate, utils as brunoUtils } from '@usebruno/common';
 import { caOptions } from '../net/ca';
 import { ProxyError, proxyAgents, proxyName, type ProxyRouter } from '../net/proxy';
+import type { LoadedClientCertificate } from '../net/client-certs';
 import { AUTH_MODES, OAUTH2_AUTHORIZATION_CODE, isOAuth2Grant, type AuthConfig, type CookieUse, type ExtractionResult, type HttpMethod, type KeyValue, type NetworkHop, type OAuth2Use, type RequestDoc, type RunResult, type ScriptRequest, type ScriptStage, type SettingsDoc, type TestResult, type TimelineEntry } from '../../shared/model';
 import { findUnresolved } from '../../shared/vars';
 import { emptyEnvLayer, envVariables, resolveLayers, type VarLayers } from '../env/variables';
@@ -51,7 +52,7 @@ export interface RunOptions {
   collectionPath?: string;
   collectionName?: string;
   processEnv?: Record<string, string>;
-  tls?: { skipVerify: boolean; ca?: string[] };
+  tls?: { skipVerify: boolean; ca?: string[]; clientCertificates?: LoadedClientCertificate[] };
   /** Picks the proxy for each connection. Absent: connect directly (or as the host platform does). */
   proxy?: ProxyRouter;
   /** Used when the request's own timeout is 0. */
@@ -106,13 +107,15 @@ type Agents = { http: http.Agent; https: https.Agent };
 const newAgents = (tls?: RunOptions['tls'], extra: http.AgentOptions = {}, proxy?: ProxyRouter): Agents => {
   const httpOptions: http.AgentOptions = { keepAlive: true, ...extra };
   const httpsOptions: https.AgentOptions = { keepAlive: true, ...extra, ...caOptions(tls?.ca), rejectUnauthorized: !tls?.skipVerify };
-  return proxy ? proxyAgents(proxy, httpOptions, httpsOptions) : { http: new http.Agent(httpOptions), https: new https.Agent(httpsOptions) };
+  const certs = tls?.clientCertificates?.length ? tls.clientCertificates : undefined;
+  return proxy || certs ? proxyAgents(proxy, httpOptions, httpsOptions, certs) : { http: new http.Agent(httpOptions), https: new https.Agent(httpsOptions) };
 };
 
 const agentCache = new Map<string, Agents>();
 export function getAgents(tls?: RunOptions['tls'], proxy?: ProxyRouter): Agents {
   // Keyed by the full CA content: certificates of the same length often share their opening characters.
-  const key = createHash('sha256').update(JSON.stringify([!!tls?.skipVerify, tls?.ca ?? [], proxy?.key ?? ''])).digest('hex');
+  const certs = (tls?.clientCertificates ?? []).map((c) => [c.host, c.pfx?.toString('base64'), c.cert?.toString('base64'), c.key?.toString('base64'), c.passphrase]);
+  const key = createHash('sha256').update(JSON.stringify([!!tls?.skipVerify, tls?.ca ?? [], proxy?.key ?? '', certs])).digest('hex');
   let a = agentCache.get(key);
   if (!a) {
     a = newAgents(tls, {}, proxy);
@@ -317,6 +320,11 @@ export function classify(err: unknown): { outcome: RunResult['outcome']; message
   if (axios.isCancel(err) || code === 'ERR_CANCELED') return { outcome: 'cancelled', message: 'Cancelled', code };
   if (code === 'ECONNABORTED' || code === 'ETIMEDOUT') return { outcome: 'timeout', message: e.message, code };
   if (code === 'ERR_FR_TOO_MANY_REDIRECTS') return { outcome: 'network', message: 'Too many redirects', code };
+  // The server's answer about our client certificate (mutual TLS), in plain words.
+  if (/ALERT_CERTIFICATE_REQUIRED/.test(code ?? '')) return { outcome: 'network', message: "TLS error: the server requires a client certificate. Add one for this host in the environment's TLS settings", code };
+  if (/ALERT_(BAD_CERTIFICATE|UNKNOWN_CA|CERTIFICATE_UNKNOWN|UNSUPPORTED_CERTIFICATE|CERTIFICATE_REVOKED|CERTIFICATE_EXPIRED|ACCESS_DENIED)/.test(code ?? '')) {
+    return { outcome: 'network', message: `TLS error: the server didn't accept the client certificate (${code})`, code };
+  }
   if (/CERT|SELF_SIGNED|UNABLE_TO_VERIFY|TLS|SSL|ERR_TLS/.test(code ?? '')) return { outcome: 'network', message: `TLS error: ${code}`, code };
   const friendly: Record<string, string> = {
     ECONNREFUSED: 'Connection refused',

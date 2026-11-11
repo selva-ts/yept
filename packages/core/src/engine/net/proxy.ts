@@ -9,6 +9,7 @@ import net, { BlockList, isIP, type Socket } from 'node:net';
 import tls from 'node:tls';
 import { createHash } from 'node:crypto';
 import type { ProxyMode, ProxySource } from '../../shared/model';
+import { certificateFor, type LoadedClientCertificate } from './client-certs';
 
 export interface ProxyServer {
   protocol: 'http:' | 'https:';
@@ -350,24 +351,27 @@ const proxyTls = (o: tls.ConnectionOptions): tls.ConnectionOptions => ({ ca: o.c
 
 /** HTTPS through the router: each new connection asks it, and tunnels when there's a proxy. */
 class ProxyHttpsAgent extends https.Agent {
-  constructor(options: https.AgentOptions, private readonly router: ProxyRouter) {
+  constructor(options: https.AgentOptions, private readonly router?: ProxyRouter, private readonly certs?: LoadedClientCertificate[]) {
     super(options);
   }
 
   // Node's agent accepts a socket through the callback when this returns nothing.
   override createConnection(args: http.ClientRequestArgs, cb?: Callback): Duplex | undefined {
-    const options = args as ConnOptions;
+    const base = args as ConnOptions;
+    // The client certificate for this host, if one is set: offered when the server asks for one.
+    const cert = certificateFor(this.certs, base.host, base.port);
+    const options: ConnOptions = cert ? { ...base, pfx: cert.pfx, cert: cert.cert, key: cert.key, passphrase: cert.passphrase } : base;
     const direct = (): Socket => (https.Agent.prototype as unknown as { createConnection: (o: unknown) => Socket }).createConnection.call(this, options);
     const target = new URL(`https://${hostForUrl(options.host)}:${options.port}`);
     let known: ProxyServer | null | undefined;
     try {
-      known = this.router.peek(target);
+      known = this.router ? this.router.peek(target) : null;
     } catch (e) {
       failed(cb, e as Error);
       return undefined;
     }
     if (known === null) return direct();
-    (known ? Promise.resolve(known) : this.router.resolve(target))
+    (known ? Promise.resolve(known) : this.router!.resolve(target))
       .then(async (p) => {
         if (!p) return cb?.(null, direct());
         const marks: TunnelMarks = { start: performance.now() };
@@ -446,7 +450,7 @@ class ProxyHttpAgent extends http.Agent {
   }
 }
 
-/** Agents that send through the router's proxies, with the request's TLS settings. */
-export function proxyAgents(router: ProxyRouter, httpOptions: http.AgentOptions, httpsOptions: https.AgentOptions): { http: http.Agent; https: https.Agent } {
-  return { http: new ProxyHttpAgent(httpOptions, router), https: new ProxyHttpsAgent(httpsOptions, router) };
+/** Agents that send through the router's proxies (if any), offering a client certificate to hosts that have one. */
+export function proxyAgents(router: ProxyRouter | undefined, httpOptions: http.AgentOptions, httpsOptions: https.AgentOptions, certs?: LoadedClientCertificate[]): { http: http.Agent; https: https.Agent } {
+  return { http: router ? new ProxyHttpAgent(httpOptions, router) : new http.Agent(httpOptions), https: new ProxyHttpsAgent(httpsOptions, router, certs) };
 }

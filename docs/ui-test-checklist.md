@@ -164,6 +164,15 @@ For the installed build, run `dist\Yept-Setup-0.9.0.exe` instead of `npm run dev
 | `HTTPS_PROXY` set before starting Yept | It wins over the Windows settings; `NO_PROXY` hosts connect directly | |
 | A company proxy that inspects TLS, its root CA trusted in Windows | HTTPS works without skipping verification | |
 
+## H4. Client certificates
+
+| Check | Expected | Result |
+|---|---|---|
+| An API that requires a client certificate, with a PFX from your certificate authority | 200; Network shows the certificate subject | |
+| The same with a PEM certificate and an encrypted key | 200 | |
+| Without the certificate, and with a wrong passphrase | A clear message in each case | |
+| Through a company proxy | 200 with the certificate presented | |
+
 ## I. Multipart / form-data uploads
 
 | Check | Expected | Result |

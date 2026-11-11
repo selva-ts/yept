@@ -221,6 +221,18 @@ export function createRequestServices(host: AppHost, workspace: Workspace, store
     hooks.onEnvChange?.();
   });
   handle('env:clear-runtime', 2, (id, name) => { env.clearRuntime(id, existing(id, name)); });
+  handle('env:set-cert-passphrase', 4, (id, name, host, passphrase) => {
+    text(host);
+    nullableText(passphrase);
+    return changed(env.setCertPassphrase(id, existing(id, name), host, passphrase));
+  });
+  handle('env:pick-cert-file', 1, async (kind) => {
+    const key = kind === 'key';
+    const result = await host.openDialog(key
+      ? { title: 'Choose the private key (PEM)', properties: ['openFile'], filters: [{ name: 'Private keys', extensions: ['key', 'pem'] }] }
+      : { title: 'Choose a client certificate (PFX or PEM)', properties: ['openFile'], filters: [{ name: 'Certificates', extensions: ['pfx', 'p12', 'pem', 'crt', 'cer'] }] });
+    return result.canceled ? null : (result.filePaths[0] ?? null);
+  });
   handle('env:pick-ca-file', 0, async () => {
     const result = await host.openDialog({ title: 'Choose a CA certificate (PEM)', properties: ['openFile'], filters: [{ name: 'Certificates', extensions: ['pem', 'crt', 'cer'] }] });
     return result.canceled ? null : (result.filePaths[0] ?? null);
