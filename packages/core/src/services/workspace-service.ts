@@ -114,8 +114,8 @@ export class WorkspaceService {
   }
 
   /**
-   * Runs a change to the workspace after any reload in progress, and holds later reloads until it is done. A reload
-   * rebuilds the collection maps, so a change made halfway through would not find its collection or request.
+   * Runs a workspace change after any reload in progress and holds later reloads until the change is done.
+   * Reloads and writes each see the result of the operation before them.
    */
   exclusive<T>(fn: () => Promise<T>): Promise<T> {
     const task = this.reloading.then(fn);

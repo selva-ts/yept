@@ -96,11 +96,13 @@ export class Workspace {
   // ---------- loading ----------
 
   async load(): Promise<WorkspaceSnapshot> {
-    this.collections.clear();
-    this.folders.clear();
-    this.requests.clear();
-    this.problems = [];
-    for (const dir of await this.findCollectionDirs(this.root, 0)) await this.loadCollection(dir);
+    // The watcher reloads asynchronously. Keep the previous tree available to readers until the new one is ready.
+    const next = new Workspace(this.root, this.identity, this.options);
+    for (const dir of await this.findCollectionDirs(this.root, 0)) await next.loadCollection(dir);
+    this.collections = next.collections;
+    this.folders = next.folders;
+    this.requests = next.requests;
+    this.problems = next.problems;
     return this.snapshot();
   }
 
