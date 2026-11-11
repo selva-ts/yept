@@ -27,7 +27,7 @@ The application is MIT licensed, needs no Yept account and has no telemetry. Col
 
 Screenshots use an isolated profile and synthetic fixtures. See the [user guide](docs/user-guide.md), [Bruno CLI guide](docs/ci.md) and [changelog](CHANGELOG.md).
 
-Website link to be added when the domain is available.
+<!-- Website: add the link here once the domain is live. -->
 
 ## Downloads and platform status
 
