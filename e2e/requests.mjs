@@ -88,6 +88,7 @@ try {
   await page.keyboard.press('Control+s');
   const saved = await waitForFile(join(wsDir, 'sample-travel', 'Echo test.yml'), (text) => text.includes('X-Trace-Id') && text.includes('"name": "Yept"'));
   check('saved to disk', saved.includes('method: POST') && saved.includes('X-Trace-Id') && saved.includes('"name": "Yept"'));
+  await page.locator('.tab.active .dirty-dot').waitFor({ state: 'detached' });
   check('unsaved dot cleared', (await page.locator('.tab.active .dirty-dot').count()) === 0);
 
   // 6. Outcome types: HTTP error, timeout, cancel, connection refused.

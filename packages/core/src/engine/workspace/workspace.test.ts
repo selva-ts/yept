@@ -69,6 +69,23 @@ describe('Workspace', () => {
     expect(snap.problems).toEqual([]);
   });
 
+  it('keeps openable requests available while a reload reads the new tree', async () => {
+    await open();
+    const request = node('List bookings');
+    const before = ws.getRequest(request.id).doc.url;
+    const after = 'https://api.example.test/bookings';
+    const file = join(dir, 'ws', request.path);
+    await fs.writeFile(file, (await fs.readFile(file, 'utf8')).replace(/^( +url: ).*$/m, `$1${after}`));
+    const reload = ws.load();
+    try {
+      expect(ws.collectionIdOf(request.id)).toBe('collection:sample-travel');
+      expect(ws.getRequest(request.id).doc.url).toBe(before);
+    } finally {
+      await reload;
+    }
+    expect(ws.getRequest(request.id).doc.url).toBe(after);
+  });
+
   it('creates a collection without overwriting or escaping the workspace', async () => {
     await open();
     const id = await ws.createCollection('Fresh API');

@@ -129,7 +129,15 @@ try {
   const powershell = await copyAs('PowerShell');
   check('Copy as PowerShell keeps secrets masked', powershell.includes('Invoke-RestMethod @params') && powershell.includes("'Cookie' = '••••••'") && !powershell.includes('abc123'), powershell.split('\n').find((l) => l.includes('Cookie')));
   check('Copy as PowerShell with secrets includes the cookies', (await copyAs('PowerShell', true)).includes('sid=abc123'));
-  check('the secrets tick does not stay on', !(await copyAs('Python requests')).includes('abc123'));
+  for (const [label, signature] of [
+    ['JavaScript fetch', 'await fetch('],
+    ['JavaScript axios', 'await axios.request('],
+    ['Python requests', 'requests.request(']
+  ]) {
+    const snippet = await copyAs(label);
+    check(`Copy as ${label} selects the right language and resets the secrets tick`,
+      snippet.includes(signature) && snippet.includes('••••••') && !snippet.includes('abc123'));
+  }
 
   // 5b. Raw HTTP view: request and response heads as text, masked and labelled as reconstructed.
   await page.locator('.dt-details').getByRole('tab', { name: 'Request' }).click();

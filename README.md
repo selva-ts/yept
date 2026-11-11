@@ -95,10 +95,10 @@ npm run package:win
 
 The E2E command builds the app and uses Playwright with separate temporary profiles and synthetic collections. It does not use your collections or settings. Git is needed for its Git checks. OpenSSL enables optional TLS unit checks. Neither OpenSSL nor .NET is needed to build or launch Yept. See [testing](docs/testing.md) for details and failure screenshots.
 
-The Windows installer is `dist/Yept-Setup-0.9.0.exe`; the unpacked executable is `dist/win-unpacked/Yept.exe`. From the repository root, run its packaging self-tests with:
+The Windows installer is `dist/Yept-Setup-0.9.0.exe`. From the repository root, check the packaged app with an isolated profile:
 
 ```powershell
-.\dist\win-unpacked\Yept.exe --self-test
+node scripts/ci.mjs package
 ```
 
 On a Mac, replace the packaging command with `npm run package:mac`; DMG and ZIP files for arm64 and x64 appear in `dist/`. These builds remain experimental: follow [macOS build and test instructions](docs/macos-build.md), and do not treat a local signature as Apple notarization.
