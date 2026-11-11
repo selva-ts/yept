@@ -230,7 +230,7 @@ export function RequestEditor({ tab }: { tab: Tab }): React.JSX.Element {
             </div>
             {unsupportedBody && (
               <div className="empty">
-                This body type ({unsupportedBody}) isn't supported yet and is kept unchanged when you save. Sending stops with an explanation. Choosing another body type above replaces it when you save.
+                This body type isn't editable in Yept yet ({unsupportedBody}). It stays unchanged when you save. To send the request, choose a supported body type above.
               </div>
             )}
             {!unsupportedBody && d.body.mode === 'none' && <div className="empty">This request has no body.</div>}

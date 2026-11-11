@@ -1,7 +1,7 @@
 // End-to-end: multipart / form-data bodies. The Body tab's Multipart table, text and file fields, the file picker
 // (a file inside the collection is saved relative to it; one outside is kept on this computer only), sending, the
 // Network tab summary and Copy as cURL, a missing file, and the saved request file. Also a body type Yept doesn't
-// support (Bruno's binary file body): shown read-only, not sent, and kept unchanged when other fields are saved.
+// support (Bruno's binary file and SPARQL bodies): shown read-only and kept unchanged when other fields are saved.
 // Usage: npm run build && node e2e/multipart.mjs   (screenshots go to e2e/out/, which is git-ignored)
 import { _electron as electron } from 'playwright';
 import { promises as fs, readFileSync } from 'node:fs';
@@ -36,10 +36,10 @@ await fs.writeFile(outside, Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47])
 const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 
 // A request written by Bruno with a binary file body, which Yept doesn't support.
-const binaryBody = `  body:
-    type: file
+const binaryBody = `  body: # fixture file
+    type: "file"
     data:
-      - filePath: files/ticket-scan.bin
+      - filePath: "./files/ticket-scan.bin"
         contentType: application/octet-stream
         selected: true
 `;
@@ -60,6 +60,16 @@ settings:
   maxRedirects: 5
   forwardAuthorizationHeader: true
 `);
+const sparqlBody = `  body: {type: sparql, data: "SELECT * WHERE { ?s ?p ?o }"}\n`;
+const sparqlRequest = join(collectionDir, 'Query catalogue.yml');
+await fs.writeFile(sparqlRequest, `info:
+  name: Query catalogue
+  type: http
+  seq: 10
+http:
+  method: POST
+  url: https://api.example.test/query
+${sparqlBody}`);
 
 const server = createFixtureServer();
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -164,23 +174,33 @@ try {
   check('the local file is still chosen after reopening', await page.locator('.mp-file.local', { hasText: 'passport-scan.png' }).isVisible());
 
   // 8. An unsupported body type: read-only notice, nothing sent, kept unchanged when the URL is edited and saved.
-  await page.keyboard.press('Control+k');
-  await page.getByPlaceholder(/Go to request/).fill('Binary ticket scan');
-  await page.keyboard.press('Enter');
+  await page.locator('.tree-row', { hasText: 'Query catalogue' }).click();
+  await page.locator('.doc-title', { hasText: 'Query catalogue' }).waitFor({ timeout: 5000 });
+  await page.locator('.tree-row', { hasText: 'Binary ticket scan' }).click();
   await page.locator('.doc-title', { hasText: 'Binary ticket scan' }).waitFor({ timeout: 5000 });
   await page.locator('.subtab', { hasText: 'Body' }).first().click();
-  check('an unsupported body type is shown as kept unchanged', await page.getByText("This body type (Binary file) isn't supported yet and is kept unchanged").isVisible());
+  const unsupportedNote = page.getByText("This body type isn't editable in Yept yet", { exact: false });
+  check('the binary body is shown as read-only', await unsupportedNote.isVisible());
   check('no body type is selected for it', !(await page.getByLabel('No body', { exact: true }).isChecked()));
   await shot('05-unsupported-body');
   await page.keyboard.press('Control+Enter');
   const unsupported = await page.locator('.response .error-card').innerText();
   check('sending it stops with an explanation', unsupported.includes(`Body type "file" isn't supported`) && unsupported.includes('Nothing was sent'), unsupported.split('\n').join(' | '));
   await page.getByLabel('URL', { exact: true }).fill('https://api.example.test/scan/v2');
-  await page.keyboard.press('Control+s');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   const binaryFile = await waitForFile(binaryRequest, (text) => text.includes('scan/v2'));
   check('saving other fields keeps the body byte for byte', binaryFile.includes('url: https://api.example.test/scan/v2') && binaryFile.includes(`\n${binaryBody}\n`), binaryFile.split('\n').slice(6, 16).join(' | '));
   await page.getByLabel('JSON', { exact: true }).check();
-  check('choosing another body type replaces the notice', !(await page.getByText("isn't supported yet and is kept unchanged").isVisible()) && (await page.locator('.monaco-host').isVisible()));
+  check('choosing another body type replaces the notice', !(await unsupportedNote.isVisible()) && (await page.locator('.monaco-host').isVisible()));
+
+  await page.locator('.tab', { hasText: 'Query catalogue' }).click();
+  await page.locator('.doc-title', { hasText: 'Query catalogue' }).waitFor({ timeout: 5000 });
+  await page.locator('.subtab', { hasText: 'Body' }).first().click();
+  check('the SPARQL body is shown as read-only', await unsupportedNote.isVisible());
+  await page.getByLabel('URL', { exact: true }).fill('https://api.example.test/query/v2');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  const sparqlFile = await waitForFile(sparqlRequest, (text) => text.includes('query/v2'));
+  check('saving the URL keeps the SPARQL body byte for byte', sparqlFile.includes('query/v2') && sparqlFile.includes(sparqlBody));
 
   // 9. Dark theme.
   await page.emulateMedia({ colorScheme: 'dark' });

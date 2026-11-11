@@ -28,6 +28,43 @@ const BODY_MODES_FROM_BRUNO: Record<string, BodyMode> = {
   none: 'none', json: 'json', text: 'text', xml: 'xml', formUrlEncoded: 'formUrlEncoded', multipartForm: 'multipartForm'
 };
 
+// Keep the YAML source off RequestDoc so an unrelated editor change cannot normalise it.
+const preservedBodySource = new WeakMap<BrunoItem, { text: string; indent: number; newline: string }>();
+
+/** Locate the http.body pair, including comments and block scalar line breaks. */
+function bodySourceRange(source: string): { start: number; end: number; indent: number } | undefined {
+  let depth = 0;
+  let inHttp = false;
+  let bodyKey: { start: number; indent: number } | undefined;
+  let range: ReturnType<typeof bodySourceRange>;
+  let keyStart = 0;
+  yaml.load(source, {
+    listener(event, state) {
+      if (event === 'open') {
+        if (depth === 2) keyStart = state.position;
+        depth++;
+        return;
+      }
+      depth--;
+      const { position, lineStart, kind, result, input } = state;
+      const isKey = kind === 'scalar' && input[position] === ':';
+      if (depth === 1) inHttp = isKey && result === 'http';
+      if (depth !== 2 || !inHttp) return;
+      if (bodyKey) {
+        // A block map ends at the next key, after its indentation has already been read.
+        const end = lineStart > bodyKey.start && /^ *$/.test(input.slice(lineStart, position)) ? lineStart : position;
+        const lineTail = /^[ \t]*(?:#[^\r\n]*)?\r?\n/.exec(source.slice(end))?.[0] ?? '';
+        range = { ...bodyKey, end: Math.min(source.length, end + lineTail.length) };
+        bodyKey = undefined;
+      } else if (isKey && result === 'body') {
+        const beforeKey = input.slice(lineStart, keyStart);
+        bodyKey = { start: keyStart, indent: /^ *$/.test(beforeKey) ? beforeKey.length : 2 };
+      }
+    }
+  });
+  return range;
+}
+
 // Bruno keeps a file field's paths as a list (several files per field) and a text field's value as a string.
 const toMultipart = (list: any[] | undefined): MultipartField[] =>
   (list ?? []).map((x): MultipartField => {
@@ -147,6 +184,12 @@ export function isHttpItem(item: BrunoItem): boolean {
 export function parseRequestFile(text: string, format: Format): BrunoItem {
   const item = parseRequest(text, { format });
   restoreDefaultPkce(item, text, format, 'http');
+  const mode = item?.request?.body?.mode;
+  if (format === 'yml' && (mode === 'file' || mode === 'sparql')) {
+    const source = text.replace(/^\uFEFF/, '');
+    const range = bodySourceRange(source);
+    if (range) preservedBodySource.set(item, { text: source.slice(range.start, range.end), indent: range.indent, newline: source.includes('\r\n') ? '\r\n' : '\n' });
+  }
   return item;
 }
 
@@ -159,7 +202,27 @@ function restoreDefaultPkce(item: BrunoItem | null, source: string, format: Form
 }
 
 export function stringifyRequestFile(item: BrunoItem): string {
-  return stringifyRequest(item, { format: 'yml' });
+  let output: string = stringifyRequest(item, { format: 'yml' });
+  const body = preservedBodySource.get(item);
+  if (!body) return output;
+  if (body.indent !== 2) {
+    output = output.replace(/^http:\n(?: +[^\n]*\n|\n)+/m, (http) =>
+      http.replace(/^ {2}/gm, ' '.repeat(body.indent))
+    );
+  }
+  output = output.replaceAll('\n', body.newline);
+  const range = bodySourceRange(output);
+  if (!range) throw new Error('Could not preserve the original request body.');
+  const suffix = body.text.endsWith('\n') ? '' : body.newline;
+  const saved = output.slice(0, range.start) + body.text + suffix + output.slice(range.end);
+  // A body may reference an anchor elsewhere in the file. Avoid writing invalid YAML if the
+  // serializer did not keep the anchor.
+  try {
+    yaml.load(saved);
+  } catch {
+    throw new Error('Could not save without changing the original request body. Edit the YAML file directly.');
+  }
+  return saved;
 }
 
 export function toRequestDoc(item: BrunoItem): RequestDoc {
@@ -215,8 +278,10 @@ export function applyRequestDoc(original: BrunoItem, doc: RequestDoc): BrunoItem
   r.url = doc.url;
   r.params = doc.params.map((p) => ({ name: p.name, value: p.value, type: p.type, enabled: p.enabled }));
   r.headers = fromKv(doc.headers, original.request?.headers);
-  // A body mode Yept doesn't support (binary file, SPARQL...) is left exactly as it was.
-  if (!doc.body.unsupported) {
+  if (doc.body.unsupported) {
+    const source = preservedBodySource.get(original);
+    if (source) preservedBodySource.set(item, source);
+  } else {
     r.body ??= {};
     r.body.mode = doc.body.mode;
     r.body.json = doc.body.json || null;

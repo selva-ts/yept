@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { promises as fs, mkdtempSync, readFileSync, rmSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import yaml from 'js-yaml';
 import { IdentityStore } from '../identity/identity-store';
 import { Workspace } from '../workspace/workspace';
 import type { TreeNode } from '../../shared/model';
@@ -165,6 +166,55 @@ describe('import', () => {
 });
 
 describe('export and .bru conversion', () => {
+  it.each([
+    ['file', '  file: @file(files/a.bin) @contentType(application/octet-stream)\n  ~file: @file(files/b.bin) @contentType(text/plain)', [
+      { filePath: 'files/a.bin', contentType: 'application/octet-stream', selected: true },
+      { filePath: 'files/b.bin', contentType: 'text/plain', selected: false }
+    ]],
+    ['sparql', '  SELECT * WHERE { ?s ?p ?o }', 'SELECT * WHERE { ?s ?p ?o }']
+  ])('preserves a %s body when converting .bru and editing the YAML copy', async (mode, body, expectedData) => {
+    const legacy = join(dir, 'legacy');
+    await fs.mkdir(legacy);
+    await fs.writeFile(join(legacy, 'bruno.json'), '{"name":"Legacy","version":"1","type":"collection"}');
+    const source = `meta {
+  name: Sample
+  type: http
+  seq: 1
+}
+post {
+  url: https://api.example.test/sample
+  body: ${mode}
+  auth: none
+}
+body:${mode} {
+${body}
+}
+`;
+    const bruFile = join(legacy, 'Sample.bru');
+    await fs.writeFile(bruFile, source);
+    const sourceWs = await open(dir);
+    const [collection] = sourceWs.snapshot().collections;
+    expect(collection.name).toBe('Legacy');
+    expect(collection.readOnly).toBe(true);
+    expect(sourceWs.getRequest(byName(sourceWs, 'Sample').id).doc.body.unsupported).toBe(mode);
+
+    const converted = join(dir, 'converted');
+    const result = await writePlan(buildPlan(sourceWs.collectionModel(collection.id), converted), 'copy');
+    const yamlFile = join(result.dir, 'Sample.yml');
+    const original = await fs.readFile(yamlFile, 'utf8');
+    expect(yaml.load(original)).toMatchObject({ http: { body: { type: mode, data: expectedData } } });
+
+    const ws = await open(converted);
+    const request = byName(ws, 'Sample');
+    const { doc } = ws.getRequest(request.id);
+    await ws.saveRequest(request.id, { ...doc, url: 'https://api.example.test/updated' });
+    const edited = await fs.readFile(yamlFile, 'utf8');
+    expect(edited).toContain('url: https://api.example.test/updated');
+    const bodyBlock = (text: string) => text.slice(text.indexOf('  body:'), text.indexOf('settings:'));
+    expect(bodyBlock(edited)).toBe(bodyBlock(original));
+    expect(await fs.readFile(bruFile, 'utf8')).toBe(source);
+  });
+
   it('a bundled export re-imports with the same requests', async () => {
     await fs.cp(join(FIX, 'collections', 'sample-travel'), join(dir, 'src', 'sample-travel'), { recursive: true });
     const srcWs = await open(join(dir, 'src'));
