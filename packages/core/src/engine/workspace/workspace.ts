@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { join, relative, dirname, basename, extname, isAbsolute, sep } from 'node:path';
 import { utils as brunoUtils } from '@usebruno/common';
 import type { Environment, RequestDoc, SettingsDoc, TreeNode, WorkspaceSnapshot } from '../../shared/model';
-import { atomicWrite, TEMP_PREFIX } from '../fs/atomic-write';
+import { atomicWrite, renameWithRetry, TEMP_PREFIX } from '../fs/atomic-write';
 import { IdentityStore, fingerprint } from '../identity/identity-store';
 import { localFileMap, withLocalFiles } from '../../shared/multipart';
 import { parseDotEnv } from '@usebruno/filestore';
@@ -322,7 +322,7 @@ export class Workspace {
       const target = this.uniquePath(dir, basename(r.file, extname(r.file)), '.yml');
       this.markOwn(r.file);
       this.markOwn(target);
-      await fs.rename(r.file, target);
+      await renameWithRetry(r.file, target);
       this.identity.move(collection.dir, toPosix(relative(collection.dir, r.file)), toPosix(relative(collection.dir, target)));
       r.file = target;
       return id;
@@ -621,7 +621,7 @@ export class Workspace {
     const from = f.dir;
     this.markOwn(from);
     this.markOwn(target);
-    await fs.rename(from, target);
+    await renameWithRetry(from, target);
     this.identity.movePrefix(f.collection.dir, toPosix(relative(f.collection.dir, from)), toPosix(relative(f.collection.dir, target)));
     for (const folder of [...this.folders.values()]) {
       if (folder.dir === from || folder.dir.startsWith(from + sep)) {

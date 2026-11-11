@@ -85,7 +85,6 @@ try {
 
   // 5. Unsaved marker, then Ctrl+S writes the file.
   check('unsaved dot shown', (await page.locator('.tab.active .dirty-dot').count()) === 1);
-  await page.locator('.doc-title').click();
   await page.keyboard.press('Control+s');
   const saved = await waitForFile(join(wsDir, 'sample-travel', 'Echo test.yml'), (text) => text.includes('X-Trace-Id') && text.includes('"name": "Yept"'));
   check('saved to disk', saved.includes('method: POST') && saved.includes('X-Trace-Id') && saved.includes('"name": "Yept"'));
