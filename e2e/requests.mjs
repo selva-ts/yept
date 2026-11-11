@@ -1,5 +1,5 @@
 // End-to-end: workspace, editor and sending. Drives the real Electron app with Playwright against the local fixture server.
-// Usage: npm run build && node e2e/smoke.mjs   (screenshots go to e2e/out/, which is git-ignored)
+// Usage: npm run build && node e2e/requests.mjs   (screenshots go to e2e/out/, which is git-ignored)
 import { _electron as electron } from 'playwright';
 import { promises as fs, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

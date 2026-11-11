@@ -1,6 +1,6 @@
 // End-to-end: tests and assertions, response history (survives restart, follows renames, redacted on disk),
 // viewing old runs, restore, orphaned history, and the history limits in Settings.
-// Usage: npm run build && node e2e/m3.mjs   (screenshots go to e2e/out/)
+// Usage: npm run build && node e2e/history-tests.mjs   (screenshots go to e2e/out/)
 import { _electron as electron } from 'playwright';
 import { promises as fs, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';

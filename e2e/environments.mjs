@@ -1,15 +1,27 @@
 // End-to-end: environments, local secrets, login -> token extraction -> protected call, env switching,
 // failed login, "store as local secret", and the sample ASP.NET API over https://localhost (if dotnet is installed).
-// Usage: npm run build && node e2e/m2.mjs   (screenshots go to e2e/out/)
+// Usage: npm run build && node e2e/environments.mjs   (screenshots go to e2e/out/)
 import { _electron as electron } from 'playwright';
 import { promises as fs, readFileSync } from 'node:fs';
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createFixtureServer, CLIENT_SECRET } from '../fixtures/server/server.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+// Build before allocating test resources. Missing dotnet is optional; a failed build must be visible.
+const sampleApi = join(root, 'samples', 'SampleApi');
+const build = spawnSync('dotnet', ['build', '--nologo', '--verbosity', 'quiet'], { cwd: sampleApi, stdio: 'inherit' });
+const hasDotnet = build.error?.code !== 'ENOENT';
+if (hasDotnet) {
+  if (build.error) throw build.error;
+  if (build.status !== 0) throw new Error('The ASP.NET sample failed to build. Install the .NET 10 SDK and check the build output above.');
+} else {
+  console.log('SKIP ASP.NET checks: dotnet is not on PATH');
+}
+
 const out = join(root, 'e2e', 'out');
 await fs.mkdir(out, { recursive: true });
 const tmp = await fs.mkdtemp(join(tmpdir(), 'yept-e2e-'));
@@ -22,26 +34,6 @@ await fs.writeFile(join(userData, 'preferences.json'), JSON.stringify({ lastWork
 const server = createFixtureServer();
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
-
-// Sample ASP.NET API (optional).
-let dotnet = null;
-let hasDotnet = false;
-try {
-  execFileSync('dotnet', ['--version'], { stdio: 'ignore' });
-  hasDotnet = true;
-} catch {}
-let dotnetSkip = 'dotnet not installed';
-if (hasDotnet) {
-  // Build first so the suite also works after a fresh checkout; an up-to-date build takes a few seconds.
-  const sampleApi = join(root, 'samples', 'SampleApi');
-  try {
-    execFileSync('dotnet', ['build', '--nologo', '--verbosity', 'quiet'], { cwd: sampleApi, stdio: 'ignore' });
-    dotnet = spawn('dotnet', ['run', '--no-build', '--urls', 'https://localhost:7443'], { cwd: sampleApi, stdio: 'ignore' });
-  } catch {
-    hasDotnet = false;
-    dotnetSkip = 'the sample API did not build (run "dotnet build samples/SampleApi" to see why)';
-  }
-}
 
 const results = [];
 const check = (name, ok, detail = '') => {
@@ -84,7 +76,12 @@ const openEnvEditor = async (collection) => {
 };
 const closeEnvEditor = () => page.getByRole('dialog', { name: 'Environments' }).getByRole('button', { name: 'Close' }).click();
 
+let dotnet = null;
 try {
+  if (hasDotnet) {
+    dotnet = spawn('dotnet', ['run', '--no-build', '--urls', 'https://localhost:7443'], { cwd: sampleApi, stdio: 'ignore' });
+    dotnet.on('error', (error) => check('ASP.NET sample starts', false, error.message));
+  }
   await page.getByText('Sample Travel').waitFor({ timeout: 15000 });
   await page.getByRole('button', { name: 'Open Sample Travel' }).click();
 
@@ -197,8 +194,6 @@ try {
     const body = (await page.locator('.response .monaco-editor .view-lines').innerText()).replaceAll(String.fromCharCode(160), ' ');
     check('ASP.NET protected endpoint with inherited collection bearer auth', (await status()).startsWith('200') && body.includes('"username": "demo"'), body.slice(0, 80));
     await shot('05-aspnet');
-  } else {
-    console.log(`SKIP ASP.NET checks: ${dotnetSkip}`);
   }
 
   await page.emulateMedia({ colorScheme: 'dark' });

@@ -76,10 +76,9 @@ For macOS shells, use `export NODE_USE_SYSTEM_CA=1`. Keep certificate verificati
 
 ## Check and package
 
-If `dotnet` is absent, the ASP.NET sample checks skip. If it is installed, the suite expects the .NET 10 sample to be built and its development certificate trusted. Before the first E2E run, prepare it with:
+The E2E suite builds the ASP.NET sample automatically. To run those checks, install the .NET 10 SDK and trust its development certificate once. If `dotnet` is absent, the ASP.NET checks are skipped.
 
 ```sh
-dotnet build samples/SampleApi
 dotnet dev-certs https --trust
 ```
 
