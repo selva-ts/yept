@@ -82,7 +82,7 @@ jobs:
       - name: Retain VSIX
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: yept-vscode-${{ github.ref_name }}-${{ github.run_attempt }}
+          name: yept-vscode-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ env.VSIX }}
           if-no-files-found: error
           compression-level: 0
