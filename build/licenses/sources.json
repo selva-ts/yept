@@ -282,6 +282,14 @@
       "note": "The published package declares this licence but supplies no complete licence document. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice.",
       "author": "Carl Xiong",
       "integrity": "sha512-95Pu1QXQvruGEhv62XCMO3Mm90GscOCClvrIUwCM0PYOXK3kaF3l3sIHxx71ThJfcbM2O5Au6SO3AWCSEfW4mQ=="
+    },
+    "@napi-rs/lzma-linux-x64-gnu@1.5.1": {
+      "license": "MIT",
+      "kind": "declared-standard",
+      "standard": "MIT",
+      "source": "https://registry.npmjs.org/%40napi-rs%2Flzma-linux-x64-gnu/1.5.1",
+      "note": "The published package declares this licence but supplies no complete licence document, and the upstream repository has none. Standard SPDX terms are supplied; author metadata is attribution, not an invented copyright notice. Installed only on Linux with glibc, as an optional dependency of rollup.",
+      "integrity": "sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ=="
     }
   },
   "families": [
