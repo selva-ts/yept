@@ -63,6 +63,7 @@ jobs:
           node --version
           npm --version
           npm ci 2>&1 | tee out/ci/install.log
+          npx --no-install install-electron 2>&1 | tee out/ci/electron.log
 
       - name: Typecheck
         run: npm run typecheck 2>&1 | tee out/ci/typecheck.log
