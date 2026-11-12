@@ -9,6 +9,8 @@ Yept is a local desktop API client for debugging HTTP integrations. Collections 
 
 The application is MIT licensed, needs no Yept account and has no telemetry. Collections stay in your folders; local secrets, cookies, history and personal settings stay in the app's user-data folder. Requests go to the APIs you choose, and Git operations use your configured remotes and credentials.
 
+Website: [selva-ts.github.io/yept](https://selva-ts.github.io/yept/)
+
 ## What it does
 
 - Edit requests with headers, query parameters, JSON, text, XML, URL-encoded forms and multipart file uploads.

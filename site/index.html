@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yept | Send. Inspect. Repeat.</title>
+<meta name="description" content="Yept is a local, Git-friendly desktop API client for debugging HTTP integrations. Plain-file collections, deep request diagnostics, redacted history. MIT licensed, no account, no telemetry.">
+<meta name="theme-color" content="#111b30">
+<meta property="og:title" content="Yept | Send. Inspect. Repeat.">
+<meta property="og:description" content="A local, Git-friendly API client that shows what really happened between your request and its response.">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Yept home"><img src="assets/yept-icon.svg" alt="" width="30" height="30">Yept</a>
+    <nav aria-label="Primary">
+      <ul>
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#git">Git &amp; teams</a></li>
+        <li><a href="#privacy">Privacy</a></li>
+        <li><a href="#get">Get Yept</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+    </nav>
+    <a class="btn btn-primary" href="#get">Get Yept</a>
+  </div>
+</header>
+
+<main id="main">
+<div id="top"></div>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="wrap">
+    <span class="eyebrow"><b>v0.9.0</b> · Windows and macOS · VS Code extension on the way</span>
+    <h1>Send. Inspect. <span class="grad">Repeat.</span></h1>
+    <p class="lede">The API client that shows what really happened between your request and its response. Local-first, built on plain files you can review in Git. No account, no telemetry.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#get">Get Yept</a>
+      <a class="btn btn-ghost" href="#how">See how it works</a>
+    </div>
+    <p class="fine">Free and open source · MIT licensed</p>
+
+    <div class="shot">
+      <div class="bar" aria-hidden="true"><i></i><i></i><i></i></div>
+      <img src="assets/request-diagnostics.png" width="1400" height="900" alt="Yept showing a GET request, its JSON response, and the Network panel with a timing breakdown for DNS, TCP, TLS, first byte and download.">
+    </div>
+  </div>
+</div>
+
+<!-- Loop -->
+<section id="how">
+  <div class="wrap">
+    <div class="center">
+      <span class="kicker">The loop</span>
+      <h2>Three verbs. One tight loop.</h2>
+      <p class="sub">Debugging an integration is the same loop every time. Yept is built around it.</p>
+    </div>
+    <div class="loop">
+      <article><span class="n">01</span><h3>Send</h3><p>Compose requests with environments, encrypted local secrets, OAuth2 and scripts. Unresolved variables stop the send before it leaves your machine.</p></article>
+      <article><span class="n">02</span><h3>Inspect</h3><p>See redirect hops, the headers actually sent, timings, TLS details, cookies and the reconstructed raw HTTP. Copy a masked cURL in one click.</p></article>
+      <article><span class="n">03</span><h3>Repeat</h3><p>Replay from redacted history, run a whole collection in order with assertions, and commit the result so your team can do the same.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- Inspect deep dive -->
+<section class="band">
+  <div class="wrap split">
+    <div>
+      <span class="kicker">Dev tools for your API calls</span>
+      <h2>Stop guessing what was on the wire.</h2>
+      <p class="sub">Browser-style tooling for any HTTP call: Console, Network, Cookies and Performance, one keystroke away.</p>
+      <ul class="ticks">
+        <li><b>Every hop.</b> Redirect chains with the cookie that rode along each one.</li>
+        <li><b>Real timings.</b> DNS, TCP, TLS, time to first byte, download.</li>
+        <li><b>Safe by default.</b> Secrets are masked in the UI, copies and history unless you ask otherwise.</li>
+        <li><b>Raw HTTP view.</b> Reconstructed request and response text, clearly labelled as such.</li>
+      </ul>
+    </div>
+    <div class="code" role="img" aria-label="Example of a masked sent request and the response status line">
+      <span class="title">Network · sent request (masked)</span>
+<span class="k">GET</span> /bookings?status=open <span class="c">HTTP/1.1</span>
+<span class="s">Host:</span> api.example.test
+<span class="s">Authorization:</span> Bearer <span class="r">••••••••</span>
+<span class="s">Accept:</span> application/json
+<span class="s">Cookie:</span> session=<span class="r">••••</span> <span class="c">← from jar</span>
+
+<span class="c">HTTP/1.1</span> <span class="g">200 OK</span>  <span class="c">81 ms · 252 B</span>
+<span class="s">Content-Type:</span> application/json
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="wrap">
+    <div class="center">
+      <span class="kicker">Features</span>
+      <h2>Everything you need. Nothing you didn't ask for.</h2>
+      <p class="sub">A focused desktop client for the work developers actually do against HTTP APIs.</p>
+    </div>
+    <div class="grid">
+      <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h7"/></svg></div><h3>Rich request editor</h3><p>Headers, query params, JSON, text, XML, URL-encoded forms and multipart file uploads, with a syntax-aware editor.</p></div>
+      <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div><h3>Environments and secrets</h3><p>Switch environments in a click. Secrets live encrypted on your computer, never in the files you share.</p></div>
+      <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg></div><h3>Auth that renews itself</h3><p>Bearer, basic, API key, Digest, NTLM, AWS Signature v4 and OAuth2 (client credentials, authorisation code with PKCE, password), with tokens cached and renewed.</p></div>
+      <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M8 5l-5 7 5 7M16 5l5 7-5 7"/></svg></div><h3>Scripts and tests</h3><p>Pre- and post-request scripts, assertions and chained requests, compatible with Bruno scripts.</p></div>
+      <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M5 4l14 8-14 8z"/></svg></div><h3>Collection runner</h3><p>Run a folder or a whole collection with CSV or JSON data, repeats and delays. Export JUnit XML or an HTML report.</p></div>
+      <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><h3>Response history</h3><p>Redacted before it is stored, and it follows a request when you rename or move its file.</p></div>
+      <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></svg></div><h3>Import and export</h3><p>Bring in Postman, Insomnia, OpenAPI and Bruno. Paste a cURL command to create a request instantly.</p></div>
+      <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/></svg></div><h3>Your look</h3><p>Light, dark and high-contrast themes, plus the installed fonts and code size you prefer.</p></div>
+      <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H4zM8 20h8M12 16v4"/></svg></div><h3>Proxies and certificates</h3><p>Works behind a company proxy: Windows settings, setup scripts or a manual proxy with sign-in. Client certificates for APIs that need mutual TLS.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- Git -->
+<section id="git" class="band">
+  <div class="wrap split rev">
+    <div class="code" role="img" aria-label="Example collection folder with YAML request files">
+      <span class="title">my-api/  ·  plain files, reviewed like code</span>
+<span class="c">opencollection.yml</span>
+<span class="k">bookings/</span>
+  <span class="s">Login.yml</span>
+  <span class="s">List bookings.yml</span>
+  <span class="s">Create booking.yml</span>
+<span class="k">environments/</span>
+  <span class="s">local.yml</span>  <span class="c"># secrets stay out of Git</span>
+
+<span class="g">+</span> <span class="s">url:</span> {{baseUrl}}/bookings
+<span class="g">+</span> <span class="s">auth:</span> inherit
+    </div>
+    <div>
+      <span class="kicker">Git &amp; teams</span>
+      <h2>Collections your whole team can review.</h2>
+      <p class="sub">Requests are plain, diff-friendly Bruno OpenCollection YAML. Share them the way you share code, in the repo you already have.</p>
+      <ul class="ticks">
+        <li><b>Built-in Git panel.</b> Review diffs, stage, commit selected files, fetch, pull, push, sync and switch branches without leaving Yept.</li>
+        <li><b>Leak check.</b> Flags common credential patterns before you commit them.</li>
+        <li><b>Never destructive.</b> No force-push, reset, stash or rebase. Anything risky stays in your own Git tool.</li>
+        <li><b>Bruno compatible.</b> Collections keep working in Bruno, and Yept opens yours.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- Privacy -->
+<section id="privacy">
+  <div class="wrap">
+    <div class="center">
+      <span class="kicker">Privacy</span>
+      <h2>Your data stays on your machine.</h2>
+      <p class="sub">Yept talks to the APIs you choose and the Git remotes you've configured. That's it.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>0</b><span>accounts to create</span></div>
+      <div class="stat"><b>0</b><span>telemetry or analytics</span></div>
+      <div class="stat"><b>MIT</b><span>open source licence</span></div>
+      <div class="stat"><b>Local</b><span>secrets, cookies &amp; history</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- Get -->
+<section id="get" class="band">
+  <div class="wrap">
+    <div class="center">
+      <span class="kicker">Get Yept</span>
+      <h2>Where you can run it.</h2>
+      <p class="sub">Download the installers from GitHub Releases. They are unsigned, so check each file against <code>SHA256SUMS.txt</code> and follow the install steps in the README.</p>
+    </div>
+    <div class="plat">
+      <div><span class="tag on">Available</span><h3>Windows x64</h3><p>Primary platform. An NSIS installer; unsigned, so Windows SmartScreen asks before it runs.</p></div>
+      <div><span class="tag soon">Coming</span><h3>VS Code</h3><p>Extension for the Visual Studio Marketplace and Open VSX, prepared for pre-release.</p></div>
+      <div><span class="tag on">Available</span><h3>macOS</h3><p>DMG or ZIP for Apple Silicon and Intel. Not signed or notarized; the README shows how to open it.</p></div>
+      <div><span class="tag no">Not planned</span><h3>Linux</h3><p>No desktop Linux package at this time.</p></div>
+    </div>
+    <div class="cta" style="margin-top:40px">
+      <a class="btn btn-primary" href="https://github.com/selva-ts/yept/releases/latest">Download 0.9.0</a>
+      <a class="btn btn-ghost" href="https://github.com/selva-ts/yept">View source on GitHub</a>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="wrap">
+    <div class="center"><span class="kicker">FAQ</span><h2>Good questions.</h2></div>
+    <div class="faq">
+      <details><summary>Is Yept a fork of Bruno?</summary><p>No. Yept has its own application shell and request pipeline. It reuses Bruno's MIT-licensed file-format and scripting packages so collections stay compatible. Bruno is a trademark of its owners and Yept is not affiliated with them.</p></details>
+      <details><summary>Do I need an account?</summary><p>No. There is no sign-up, no cloud and no telemetry. Collections stay in your folders.</p></details>
+      <details><summary>Where are my secrets stored?</summary><p>Encrypted on your computer, outside the collection files you commit. Secrets are masked in the interface, in copies and in history unless you explicitly include them.</p></details>
+      <details><summary>Can I import my Postman or Insomnia collections?</summary><p>Yes. Yept imports Postman, Insomnia, OpenAPI and Bruno files, moving literal secrets out of shared files, and exports a bundled OpenCollection file.</p></details>
+      <details><summary>Will it work on macOS or Linux?</summary><p>Windows is the primary platform. macOS installers for Apple Silicon and Intel are on the releases page; they aren't signed or notarized yet. There is no Linux package.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- Final CTA -->
+<div class="final">
+  <div class="wrap">
+    <h2>See what really happened.</h2>
+    <p class="sub" style="margin:0 auto 28px">Send. Inspect. Repeat.</p>
+    <div class="cta"><a class="btn btn-primary" href="#get">Get Yept</a><a class="btn btn-ghost" href="https://github.com/selva-ts/yept">Star on GitHub</a></div>
+  </div>
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a class="brand" href="#top"><img src="assets/yept-icon.svg" alt="" width="26" height="26">Yept</a>
+      <small>Yept is MIT licensed. Built on Bruno's MIT-licensed packages; not affiliated with Bruno. Screenshots use synthetic data.</small>
+    </div>
+    <ul>
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#features">Features</a></li>
+      <li><a href="#privacy">Privacy</a></li>
+      <li><a href="https://github.com/selva-ts/yept">GitHub</a></li>
+    </ul>
+  </div>
+</footer>
+</body>
+</html>
